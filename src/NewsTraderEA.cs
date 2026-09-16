@@ -11,7 +11,7 @@ namespace cAlgo.Robots
 {
     public enum AccountRole { BiasAccount, HedgeAccount }
 
-    public enum TradeLogicOption { SingleOrder, OrderSplitting, OrderCap }
+    public enum TradeLogicOption { SingleOrder, OrderSplitting }
 
     public interface ITradeStrategy
     {
@@ -43,42 +43,6 @@ namespace cAlgo.Robots
                 volumes.Add(normalizedBase);
 
             volumes.Add(initialLotSize - volumes.Sum());
-            return volumes;
-        }
-    }
-
-    public class OrderCapStrategy : ITradeStrategy
-    {
-        private readonly double _capMin;
-        private readonly double _capMax;
-
-        public OrderCapStrategy(double capMin, double capMax)
-        {
-            _capMin = capMin;
-            _capMax = capMax;
-        }
-
-        public List<double> CalculateOrderVolumes(double initialLotSize, Random random)
-        {
-            double maxVolume      = Math.Round(_capMin + random.NextDouble() * (_capMax - _capMin), 1);
-            var    volumes        = new List<double>();
-            int    numberOfSplits = (int)Math.Ceiling(initialLotSize / maxVolume);
-
-            if (numberOfSplits > 10)
-            {
-                numberOfSplits = 10;
-                maxVolume      = initialLotSize / numberOfSplits;
-            }
-
-            while (initialLotSize > maxVolume)
-            {
-                volumes.Add(maxVolume);
-                initialLotSize -= maxVolume;
-            }
-
-            if (initialLotSize > 0)
-                volumes.Add(initialLotSize);
-
             return volumes;
         }
     }
@@ -137,8 +101,6 @@ namespace cAlgo.Robots
         private const int    NewsUpdateIntervalSeconds = 300;
         private const int    NewsTimeToleranceMinutes  = 5;
         private const double MinMarginLevel            = 20.0;
-        private const double RandomCapMin              = 3.5;
-        private const double RandomCapMax              = 10.0;
         private const double LotSizeLogThreshold       = 0.02;
 
         private readonly string _feedUrl = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
@@ -152,13 +114,13 @@ namespace cAlgo.Robots
 
         private DateTime       _triggerTime;
         private double         _currentLotSize;
+        private double         _previousCalculatedLots = -1;
         private Random         _random;
         private DateTime       _lastNewsUpdate      = DateTime.MinValue;
         private DateTime       _lastLotSizeCalcTime = DateTime.MinValue;
         private double         _cachedLotSize;
         private double         _lastLoggedLotSize;
         private bool           _ordersPlaced;
-        private double         _initialLotSize;
         private List<double>   _orderVolumes;
         private ITradeStrategy _tradeStrategy;
         private Border         _dashboardPanel;
@@ -169,7 +131,7 @@ namespace cAlgo.Robots
         private List<NewsEventInfo> _allWeeklyEvents   = new List<NewsEventInfo>();
         private NewsEventInfo       _targetEvent        = null;
 
-        // Display labels — same three positions as News Trader Pro
+        // Display labels
         private const string CountdownLabel = "countdown";
         private const string LotSizeLabel   = "lotsize";
         private const string NewsLabel      = "NewsEventsLabel";
@@ -183,18 +145,15 @@ namespace cAlgo.Robots
             Timer.Start(1);
             _random         = new Random();
             _currentLotSize = CalculateLotSize();
-            _initialLotSize = Symbol.VolumeInUnitsToQuantity(_currentLotSize);
 
             _tradeStrategy = TradeLogic switch
             {
                 TradeLogicOption.SingleOrder    => new SingleOrderStrategy(),
                 TradeLogicOption.OrderSplitting => new OrderSplittingStrategy(),
-                TradeLogicOption.OrderCap       => new OrderCapStrategy(RandomCapMin, RandomCapMax),
                 _                               => throw new ArgumentOutOfRangeException()
             };
 
-            _orderVolumes = _tradeStrategy.CalculateOrderVolumes(_initialLotSize, _random);
-            Print($"[OnStart] Trade logic: {TradeLogic} | Volumes: {string.Join(", ", _orderVolumes.Select(v => v.ToString("F2")))} lots");
+            UpdateOrderVolumesIfChanged();
 
             LoadNewsEvents();
             DisplayNewsEvents();
@@ -205,26 +164,28 @@ namespace cAlgo.Robots
         {
             try
             {
-                // Always run trailing stop first on every tick
+                // 1. Trail stops first
                 if (IncludeTrailingStop)
                     UpdateTrailingStops();
 
                 bool hasPositions = Positions.FindAll(Label, SymbolName).Any();
 
-                if (hasPositions)
-                {
-                    HideChartDisplays();
-                    return;
-                }
-
-                // Margin safety check — only runs when no positions are open
-                if (Account.MarginLevel < MinMarginLevel)
+                // 2. Margin safety check MUST happen BEFORE the early return
+                if (hasPositions && Account.MarginLevel < MinMarginLevel)
                 {
                     foreach (var pos in Positions.FindAll(Label, SymbolName))
                     {
                         Print($"[Safety] Margin < {MinMarginLevel}% — closing position {pos.Id}");
                         ClosePosition(pos);
                     }
+                    hasPositions = false; // Reset since we just closed them
+                }
+
+                // 3. Early return to hide UI while in a trade
+                if (hasPositions)
+                {
+                    HideChartDisplays();
+                    return;
                 }
             }
             catch (Exception ex)
@@ -237,7 +198,6 @@ namespace cAlgo.Robots
         {
             try
             {
-                // If a position is open, wipe all chart displays and do nothing else
                 if (Positions.FindAll(Label, SymbolName).Any())
                 {
                     HideChartDisplays();
@@ -249,8 +209,7 @@ namespace cAlgo.Robots
                 UpdateUI(now);
 
                 _currentLotSize = CalculateLotSize();
-                double updatedLots = Symbol.VolumeInUnitsToQuantity(_currentLotSize);
-                _orderVolumes = _tradeStrategy.CalculateOrderVolumes(updatedLots, _random);
+                UpdateOrderVolumesIfChanged();
 
                 PrepareOrders(now);
             }
@@ -272,6 +231,18 @@ namespace cAlgo.Robots
             _triggerTime = new DateTime(now.Year, now.Month, now.Day, NewsHour, NewsMinute, 0);
         }
 
+        private void UpdateOrderVolumesIfChanged()
+        {
+            double updatedLots = Symbol.VolumeInUnitsToQuantity(_currentLotSize);
+            if (Math.Abs(updatedLots - _previousCalculatedLots) > 0.001)
+            {
+                _orderVolumes = _tradeStrategy.CalculateOrderVolumes(updatedLots, _random);
+                _previousCalculatedLots = updatedLots;
+                if (TradeLogic != TradeLogicOption.SingleOrder)
+                    Print($"[Strategy] Order splits regenerated: {string.Join(", ", _orderVolumes.Select(v => v.ToString("F2")))} lots");
+            }
+        }
+
         private void PrepareOrders(DateTime now)
         {
             if (now > _triggerTime) return;
@@ -279,9 +250,9 @@ namespace cAlgo.Robots
             if (_ordersPlaced) return;
             if (_executionDirection == null)
             {
-                Print("[Orders] AI direction not yet resolved — re-running analysis.");
-                RunAiHeuristics();
-                if (_executionDirection == null) return;
+                Print("[Orders] AI direction is SKIP/Unresolved. Standing down.");
+                _ordersPlaced = true; // Prevent spamming logs, we've decided not to trade this cycle
+                return;
             }
 
             _ordersPlaced = true;
@@ -297,7 +268,6 @@ namespace cAlgo.Robots
 
         private void PlaceOrder(TradeType type, double volume)
         {
-            // No Take Profit — trailing stop is the sole exit mechanism
             ExecuteMarketOrderAsync(type, SymbolName, volume, Label, StopLoss, null, Comment, result =>
             {
                 if (result.IsSuccessful)
@@ -379,51 +349,59 @@ namespace cAlgo.Robots
 
             double score = 0;
             string title = _targetEvent.Title.ToLower();
+            bool hasPrecursor = false;
 
             if (title.Contains("non-farm") || title.Contains("nfp"))
             {
                 var adp = FindPrecursor("ADP Non-Farm");
-                if (adp != null) { score += Surprise(adp) * -1.5; Print($"[AI] NFP | ADP surprise → score {score:+0.0;-0.0}"); }
+                if (adp != null) { score += Surprise(adp) * -1.5; hasPrecursor = true; Print($"[AI] NFP | ADP surprise → score {score:+0.0;-0.0}"); }
                 else Print("[AI] NFP | ADP not yet published this week.");
             }
             else if (title.Contains("cpi") || title.Contains("consumer price"))
             {
                 var ism = FindPrecursor("ISM Services");
-                if (ism != null) { score += Surprise(ism) * -1.0; Print($"[AI] CPI | ISM Services surprise → score {score:+0.0;-0.0}"); }
+                if (ism != null) { score += Surprise(ism) * -1.0; hasPrecursor = true; Print($"[AI] CPI | ISM Services surprise → score {score:+0.0;-0.0}"); }
                 else Print("[AI] CPI | ISM Services not yet published this week.");
             }
             else if (title.Contains("ppi") || title.Contains("producer price"))
             {
                 var cpi = FindPrecursor("CPI");
-                if (cpi != null) { score += Surprise(cpi) * -1.0; Print($"[AI] PPI | CPI precursor → score {score:+0.0;-0.0}"); }
+                if (cpi != null) { score += Surprise(cpi) * -1.0; hasPrecursor = true; Print($"[AI] PPI | CPI precursor → score {score:+0.0;-0.0}"); }
                 else Print("[AI] PPI | CPI not yet published this week.");
             }
             else if (title.Contains("retail"))
             {
                 var conf = FindPrecursor("Consumer Confidence");
-                if (conf != null) { score += Surprise(conf) * -1.5; Print($"[AI] Retail | Confidence surprise → score {score:+0.0;-0.0}"); }
+                if (conf != null) { score += Surprise(conf) * -1.5; hasPrecursor = true; Print($"[AI] Retail | Confidence surprise → score {score:+0.0;-0.0}"); }
                 else Print("[AI] Retail | Consumer Confidence not yet published this week.");
             }
             else if (title.Contains("fomc") || title.Contains("federal funds") || title.Contains("interest rate"))
             {
                 var cpi = FindPrecursor("CPI");
-                if (cpi != null) { score += Surprise(cpi) * -1.0; Print($"[AI] FOMC | CPI precursor → score {score:+0.0;-0.0}"); }
+                if (cpi != null) { score += Surprise(cpi) * -1.0; hasPrecursor = true; Print($"[AI] FOMC | CPI precursor → score {score:+0.0;-0.0}"); }
                 else Print("[AI] FOMC | CPI not yet published this week.");
             }
             else if (title.Contains("gdp"))
             {
                 var ism = FindPrecursor("ISM Manufacturing");
-                if (ism != null) { score += Surprise(ism) * -1.0; Print($"[AI] GDP | ISM Mfg → score {score:+0.0;-0.0}"); }
+                if (ism != null) { score += Surprise(ism) * -1.0; hasPrecursor = true; Print($"[AI] GDP | ISM Mfg → score {score:+0.0;-0.0}"); }
                 else Print("[AI] GDP | ISM Manufacturing not yet published this week.");
             }
             else
             {
-                Print($"[AI] '{_targetEvent.Title}' — no specific precursor model. Defaulting to BUY.");
+                Print($"[AI] '{_targetEvent.Title}' — no specific precursor model. Skipping trade.");
             }
 
-            if      (score > 0) _aiBias = TradeType.Buy;
-            else if (score < 0) _aiBias = TradeType.Sell;
-            else                _aiBias = TradeType.Buy;
+            if (!hasPrecursor || score == 0)
+            {
+                Print("[AI] No precursor data or neutral score. Bias is SKIP (No Trade).");
+                _aiBias = null;
+                _executionDirection = null;
+                return;
+            }
+
+            if (score > 0) _aiBias = TradeType.Buy;
+            if (score < 0) _aiBias = TradeType.Sell;
 
             _executionDirection = Role == AccountRole.HedgeAccount
                 ? (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy)
@@ -478,7 +456,6 @@ namespace cAlgo.Robots
                 DateTime today = Server.Time.Date;
                 _triggerTime = new DateTime(today.Year, today.Month, today.Day, NewsHour, NewsMinute, 0);
 
-                // Load ALL events this week for AI precursor scanning
                 _allWeeklyEvents.Clear();
                 _targetEvent = null;
 
@@ -512,7 +489,6 @@ namespace cAlgo.Robots
 
                 _allWeeklyEvents = _allWeeklyEvents.OrderBy(e => e.EventTime).ToList();
 
-                // Identify the target event: today, matching the user's time, matching the attached symbol's currency
                 _targetEvent = _allWeeklyEvents.FirstOrDefault(e =>
                     e.EventTime.Date == today &&
                     e.EventTime.Hour   == NewsHour &&
@@ -527,8 +503,6 @@ namespace cAlgo.Robots
                     Print($"[News] Target: '{_targetEvent.Title}' @ {_targetEvent.EventTime:HH:mm}");
                     RunAiHeuristics();
                 }
-
-                Print($"[News] {_allWeeklyEvents.Count} total events loaded for AI precursor scanning.");
             }
             catch (Exception ex)
             {
@@ -545,7 +519,7 @@ namespace cAlgo.Robots
             else
             {
                 sb.AppendLine($"Target: {_targetEvent.Currency}: {_targetEvent.Title}");
-                sb.AppendLine($"AI Bias: {(_aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() : "Analysing...")}");
+                sb.AppendLine($"AI Bias: {(_aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() : "SKIP (No Trade)")}");
                 sb.AppendLine($"Executing: {(_executionDirection.HasValue ? _executionDirection.Value.ToString().ToUpper() : "---")}");
             }
 
@@ -589,10 +563,10 @@ namespace cAlgo.Robots
             if (_dashboardPanel != null)
                 Chart.RemoveControl(_dashboardPanel);
 
-            string biasText  = _aiBias.HasValue ? (_aiBias == TradeType.Buy ? "BUY  ▲" : "SELL  ▼") : "Analysing...";
+            string biasText  = _aiBias.HasValue ? (_aiBias == TradeType.Buy ? "BUY  ▲" : "SELL  ▼") : "SKIP";
             string execText  = _executionDirection.HasValue ? (_executionDirection == TradeType.Buy ? "BUY  ▲" : "SELL  ▼") : "---";
             Color  biasColor = _aiBias == TradeType.Buy ? Color.LimeGreen : (_aiBias == TradeType.Sell ? Color.Red : Color.Gray);
-            Color  execColor = _executionDirection == TradeType.Buy ? Color.LimeGreen : Color.OrangeRed;
+            Color  execColor = _executionDirection == TradeType.Buy ? Color.LimeGreen : Color.Gray;
             Color  roleColor = Role == AccountRole.BiasAccount ? Color.DodgerBlue : Color.Orange;
             Color  trailColor = IncludeTrailingStop ? Color.LimeGreen : Color.Gray;
 
@@ -600,7 +574,6 @@ namespace cAlgo.Robots
             {
                 TradeLogicOption.SingleOrder    => "Single Order",
                 TradeLogicOption.OrderSplitting => "Order Split",
-                TradeLogicOption.OrderCap       => "Order Cap",
                 _                               => TradeLogic.ToString()
             };
 

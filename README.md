@@ -51,16 +51,28 @@ Because the risk is strictly capped to the allocated block ($450 total exposure)
 
 > Full simulation code: [`backtest/forensic_dual_sim.py`](backtest/forensic_dual_sim.py)
 
-## Architecture
+## Architecture & Design Rationale
 
-News Trader AI is a fully autonomous C# cBot that plugs directly into cTrader. There is no Python dependency at runtime. The bot:
+News Trader AI is a fully autonomous C# cBot that plugs directly into cTrader. There is no Python dependency at runtime.
 
-1. Fetches the ForexFactory XML calendar on startup
-2. Identifies the event at your configured hour and minute
-3. Scans the rest of the week's feed for precursor events (ADP, ISM, Consumer Confidence, etc.)
-4. Calculates an AI heuristic score and resolves a directional bias
-5. Fires at exactly `N` seconds before the event using a 1-second timer
-6. Manages the trade autonomously via trailing stop — no Take Profit set
+### 1. The Risk Model and "The Pot"
+The system utilizes a specialized risk isolation model:
+- **The Setup:** Instead of risking the full $1,000 pot directly on one trade, we isolate capital into sub-accounts (e.g., $300 in BiasAccount, $150 in HedgeAccount). 
+- **Parameter Usage:** The bot's `Risk Percentage = 80%` parameter applies **only to the local sub-account balance**, not the total pot. 
+- **Why we do this:** This hard-caps our maximum exposure during a double-whipsaw (both SLs hit) to exactly the allocated capital. The cash reserve is preserved off-chart, while the active terminal uses maximum leverage to generate asymmetrical upside on the winning leg. As the pot grows by $3,000, we simply transfer more capital into the trading terminals to increase the multiplier.
+
+### 2. Why Random Order Splitting is Necessary
+The `OrderSplitting` trade logic splits the calculated lot size into a randomized number of smaller orders (between 10 and 20). This is not an execution bug; it is an active **Broker Obfuscation Strategy**. High-frequency news scalping is often flagged by broker algorithms if executed as massive single-block orders. Randomly splitting the total volume helps mask the straddle signature from toxic flow detection systems.
+
+### 3. Sole Reliance on Trailing Stops
+The architecture deliberately omits a Take Profit (TP) parameter. The entire strategy relies heavily on the Trailing Stop mechanism. 
+- **The Rationale:** Macro news events often trigger multi-hour directional trends. By not capping the upside, the winning leg (either Bias or Hedge) is allowed to run completely unchecked until volatility reverses. This open-ended exit is exactly how a $300 risk position can generate thousands of dollars on a single NFP print.
+
+### 4. M1 Chart Requirement
+While the cBot code is event-driven (using `OnTick` and `OnTimer`), it is strictly designed to be deployed on the **XAUUSD M1 chart**. We do not programmatically lock the timeframe to allow for visual flexibility, but deploying this on higher timeframes will delay trailing stop execution loops and invalidate the backtested entry logic.
+
+### 5. Manual News Timing
+The strategy intentionally uses manually configured `News Hour` and `News Minute` inputs rather than relying entirely on the ForexFactory API for execution timing. This ensures the bot always has an explicit, user-validated source of truth for the countdown timer, removing the risk of API latency or unexpected calendar shifts milliseconds before the event.
 
 ### The Two-Terminal Setup
 

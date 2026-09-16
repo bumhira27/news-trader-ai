@@ -5,11 +5,18 @@ All notable changes to the News Trader AI project will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-09-16
+## [0.2.0] - 2024-11-20
 
-### Added
-- **Heuristic Prediction Engine (`predict_advanced`)**: Python-based event correlation engine parsing HuggingFace datasets to generate predictive bias.
-- **Asymmetric Straddle EA**: C# cTrader cBot integrating the Holy Trinity risk management model (BiasAccount & HedgeAccount modes).
+### Changed
+- **Architecture Shift:** Replaced Python `live_predictor.py` IPC architecture with a fully native C# AI heuristic engine. cBot now parses the ForexFactory XML directly.
+- **Risk Management:** Shifted from hard-coded $1000/$500 logic to a dynamic `RiskPercentage` parameter designed to be used with isolated sub-account balances (The "Pot" model).
+- **Execution Guard:** Removed deterministic `OrderCapStrategy` and fully embraced randomized `OrderSplitting` as a broker-obfuscation tactic.
+- **Fail-Safe:** Margin safety check prioritized in `OnTick()` execution loop.
+- **AI Logic:** Introduced explicit `NO TRADE` / Skip states if precursor data is missing or returns a neutral score.
+
+### Removed
+- Removed `news_bias.txt` flat-file observer logic (no longer needed).
+- Removed `OrderCapStrategy`.
 - **Automated IPC Protocol**: Zero-latency flat-file bridge allowing C# to read python-generated predictions from `C:\news_bias.txt`.
 - **Backtest Generation Suite**: Polars and Plotly implementation for outputting equity curves, trade history, and statistical performance matrix.
 - **Holy Trinity Filter**: Automated XML parsing of ForexFactory to restrict execution exclusively to NFP, Retail Sales, and CPI.
