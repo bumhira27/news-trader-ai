@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.parquet
+*.txt
+!requirements.txt
+!backtest/breakdown.txt
+!backtest/grouped_breakdown.txt
+!backtest/sorted_breakdown.txt
+!backtest/trinity_out.txt
