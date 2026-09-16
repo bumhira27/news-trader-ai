@@ -629,10 +629,10 @@ namespace cAlgo.Robots
 
             // Group 1: AI Direction
             panel.AddChild(Divider());
-            panel.AddChild(Row("Role:",     Role.ToString(), roleColor));
-            panel.AddChild(Row("AI Bias:",  biasText,        biasColor));
-            panel.AddChild(Row("Execute:",  execText,        execColor));
-            panel.AddChild(Row("Risk:",     $"{RiskPercentage}%", Color.White));
+            panel.AddChild(Row("Role:",         Role.ToString(), roleColor));
+            panel.AddChild(Row("AI Bias:",      biasText,        biasColor));
+            panel.AddChild(Row("Risk:",         $"{RiskPercentage}%",  Color.White));
+            panel.AddChild(Row("Secs Before:",  $"{SecondsBefore}s",   Color.Yellow));
 
             // Group 2: Trailing
             panel.AddChild(Divider());
