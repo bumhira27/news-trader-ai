@@ -13,6 +13,8 @@ namespace cAlgo.Robots
 
     public enum TradeLogicOption { SingleOrder, OrderSplitting }
 
+    public enum BiasOverride { Auto, Buy, Sell, Skip }
+
     public interface ITradeStrategy
     {
         List<double> CalculateOrderVolumes(double initialLotSize, Random random);
@@ -94,6 +96,9 @@ namespace cAlgo.Robots
         [Parameter("Trade Logic",             Group = "Trading Options", DefaultValue = TradeLogicOption.SingleOrder)]
         public TradeLogicOption TradeLogic { get; set; }
 
+        [Parameter("Manual Override Bias",    Group = "AI Override (Last Week Data)", DefaultValue = BiasOverride.Auto)]
+        public BiasOverride ManualBias { get; set; }
+
         #endregion
 
         #region Constants
@@ -164,24 +169,22 @@ namespace cAlgo.Robots
         {
             try
             {
-                // 1. Trail stops first
+                // Always run trailing stop first on every tick
                 if (IncludeTrailingStop)
                     UpdateTrailingStops();
 
-                bool hasPositions = Positions.FindAll(Label, SymbolName).Any();
-
-                // 2. Margin safety check MUST happen BEFORE the early return
-                if (hasPositions && Account.MarginLevel < MinMarginLevel)
+                // Margin safety check — MUST run before returning
+                if (Account.MarginLevel < MinMarginLevel)
                 {
                     foreach (var pos in Positions.FindAll(Label, SymbolName))
                     {
                         Print($"[Safety] Margin < {MinMarginLevel}% — closing position {pos.Id}");
                         ClosePosition(pos);
                     }
-                    hasPositions = false; // Reset since we just closed them
                 }
 
-                // 3. Early return to hide UI while in a trade
+                bool hasPositions = Positions.FindAll(Label, SymbolName).Any();
+
                 if (hasPositions)
                 {
                     HideChartDisplays();
@@ -346,6 +349,22 @@ namespace cAlgo.Robots
         private void RunAiHeuristics()
         {
             if (_targetEvent == null) return;
+
+            if (ManualBias != BiasOverride.Auto)
+            {
+                Print($"[AI] Using Manual Override: {ManualBias}");
+                if (ManualBias == BiasOverride.Skip)
+                {
+                    _aiBias = null;
+                    _executionDirection = null;
+                }
+                else
+                {
+                    _aiBias = ManualBias == BiasOverride.Buy ? TradeType.Buy : TradeType.Sell;
+                    _executionDirection = (Role == AccountRole.BiasAccount) ? _aiBias : (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy);
+                }
+                return;
+            }
 
             double score = 0;
             string title = _targetEvent.Title.ToLower();
