@@ -191,9 +191,12 @@ def run():
         mfe_1m, mae_1m = 0.0, 0.0
         mfe_5m, mae_5m = 0.0, 0.0
         
+        trail_sl = -SL_PIPS
+        trade_active = True
         hit_sl = False
         hit_trigger = False
         trail_survived = False
+        intrabar_collision = False
         final_pips = 0.0
         
         running_mfe = 0.0
@@ -202,30 +205,61 @@ def run():
         minutes_elapsed = 0
         for p_row in post_news_window.to_dicts():
             minutes_elapsed += 1
-            bar_mfe, bar_mae = get_mfe_mae(entry_price, p_row["high"], p_row["low"], bias)
             
-            if bar_mfe > running_mfe: running_mfe = bar_mfe
-            if bar_mae > running_mae: running_mae = bar_mae
+            # Calculate pips relative to entry for this M1 bar
+            if bias == "BUY":
+                pips_high = (p_row["high"] - entry_price) * 100
+                pips_low = (p_row["low"] - entry_price) * 100
+                pips_close = (p_row["close"] - entry_price) * 100
+                pips_open = (p_row["open"] - entry_price) * 100
+            else:
+                pips_high = (entry_price - p_row["low"]) * 100
+                pips_low = (entry_price - p_row["high"]) * 100
+                pips_close = (entry_price - p_row["close"]) * 100
+                pips_open = (entry_price - p_row["open"]) * 100
+                
+            # Update tracking metrics (regardless of whether trade is still open)
+            if pips_high > running_mfe: running_mfe = pips_high
+            if -pips_low > running_mae: running_mae = -pips_low
                 
             if minutes_elapsed == 1:
                 mfe_1m, mae_1m = running_mfe, running_mae
             if minutes_elapsed == 5:
                 mfe_5m, mae_5m = running_mfe, running_mae
                 
-            if hit_sl or trail_survived:
-                continue
+            if trade_active:
+                # CONSERVATIVE PATH ASSUMPTION: 
+                # We always evaluate the adverse excursion (Low) before the favorable excursion (High) 
+                # within the same M1 bar. This ensures we never artificially survive a spike that 
+                # actually stopped us out first.
                 
-            if bar_mae >= SL_PIPS:
-                hit_sl = True
-                final_pips = -SL_PIPS
-                continue
-                
-            if bar_mfe >= TRAIL_TRIGGER:
-                hit_trigger = True
-                trail_survived = True
-                final_pips = bar_mfe - TRAIL_STEP
-                
-        if not hit_sl and not trail_survived and post_news_window.height > 0:
+                # 1. Did the adverse excursion hit our current stop?
+                if pips_low <= trail_sl:
+                    trade_active = False
+                    final_pips = trail_sl
+                    if trail_sl == -SL_PIPS:
+                        hit_sl = True
+                        if pips_high >= TRAIL_TRIGGER:
+                            intrabar_collision = True # Bar spans both -300 and +500
+                    else:
+                        trail_survived = True
+                        
+                # 2. If we survived, did the favorable excursion move our trailing stop?
+                if trade_active and pips_high >= TRAIL_TRIGGER:
+                    hit_trigger = True
+                    new_trail = pips_high - TRAIL_STEP
+                    if new_trail > trail_sl:
+                        trail_sl = new_trail
+                        
+                    # 3. Intrabar Retracement Check: Did it spike to High and then retrace 
+                    # back down past the NEW trail SL before the bar closed?
+                    # Since we don't have ticks, checking the Close is the safest proxy.
+                    if pips_close <= trail_sl:
+                        trade_active = False
+                        final_pips = trail_sl
+                        trail_survived = True
+
+        if trade_active and post_news_window.height > 0:
             last_bar = post_news_window.to_dicts()[-1]
             if bias == "BUY":
                 final_pips = (last_bar["close"] - entry_price) * 100
@@ -256,6 +290,7 @@ def run():
         print(f"MFE_1m:             {mfe_1m:+.1f}")
         print(f"MFE_5m:             {mfe_5m:+.1f}")
         print(f"hit_SL:             {'YES' if hit_sl else 'NO'}")
+        print(f"intrabar_collision: {'YES' if intrabar_collision else 'NO'}")
         print(f"hit_trigger:        {'YES' if hit_trigger else 'NO'}")
         print(f"trail_survival:     {'YES' if trail_survived else 'NO'}")
         print(f"final_pnl:          {final_pips:+.2f} pips")
