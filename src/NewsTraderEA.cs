@@ -45,10 +45,8 @@ namespace cAlgo.Robots
         public double RiskCapital { get; set; }
 
         // ── Trade Settings (Backtested M1 Scalp Defaults) ────────────────────────────
-        [Parameter("Take Profit (pips)",  Group = "Trading", DefaultValue = 100)]
-        public int TakeProfit { get; set; }
-
-        [Parameter("Stop Loss (pips)",    Group = "Trading", DefaultValue = 25)]
+        // No Take Profit — the trailing stop manages the full exit
+        [Parameter("Stop Loss (pips)",    Group = "Trading", DefaultValue = 300)]
         public int StopLoss { get; set; }
 
         // ── Trailing Stop ─────────────────────────────────────────────────────────────
@@ -95,6 +93,7 @@ namespace cAlgo.Robots
         {
             Timer.Start(1);
 
+            // Match News Trader Pro: set trigger time on startup so countdown works immediately
             var today = Server.Time;
             _triggerTime = new DateTime(today.Year, today.Month, today.Day, NewsHour, NewsMinute, 0);
 
@@ -107,11 +106,12 @@ namespace cAlgo.Robots
 
         protected override void OnTick()
         {
+            // Margin guard — mirror News Trader Pro exactly
             if (Account.MarginLevel < MinMarginLevel)
             {
                 foreach (var pos in Positions.FindAll(Label, SymbolName))
                 {
-                    Print($"[Safety] Margin {Account.MarginLevel:F1}% < {MinMarginLevel}% — closing {pos.Id}");
+                    Print($"[Safety] Margin {Account.MarginLevel:F1}% < {MinMarginLevel}% — closing position {pos.Id}");
                     ClosePosition(pos);
                 }
             }
@@ -134,8 +134,11 @@ namespace cAlgo.Robots
                 }
 
                 DateTime now = Server.Time;
+
+                // Rebuild trigger time daily (same as News Trader Pro)
                 _triggerTime = new DateTime(now.Year, now.Month, now.Day, NewsHour, NewsMinute, 0);
 
+                // Reset ordersPlaced flag after event window passes (5 min tolerance)
                 if (now > _triggerTime.AddMinutes(NewsTimeToleranceMinutes))
                     _ordersPlaced = false;
 
@@ -172,6 +175,7 @@ namespace cAlgo.Robots
 
                 var doc = new XmlDocument();
                 doc.LoadXml(xml);
+
                 _weeklyEvents.Clear();
 
                 foreach (XmlNode node in doc.GetElementsByTagName("event"))
@@ -200,6 +204,7 @@ namespace cAlgo.Robots
                 _weeklyEvents = _weeklyEvents.OrderBy(e => e.EventTime).ToList();
                 Print($"[FF] Loaded {_weeklyEvents.Count} USD events this week.");
 
+                // Match user-configured time to an event
                 _targetEvent = _weeklyEvents.FirstOrDefault(e =>
                     e.EventTime > Server.Time &&
                     e.EventTime.Hour   == NewsHour &&
@@ -224,20 +229,23 @@ namespace cAlgo.Robots
         {
             if (_targetEvent == null) return;
 
-            double score = 0;
-            string title = _targetEvent.Title.ToLower();
+            double score     = 0;
+            string title     = _targetEvent.Title.ToLower();
 
+            // ─── NFP ────────────────────────────────────────────────────────────────
             if (title.Contains("farm") || title.Contains("nfp"))
             {
                 var adp = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("ADP Non-Farm") && e.Actual.HasValue);
                 if (adp != null)
                 {
                     double surprise = adp.Actual.Value - (adp.Forecast ?? adp.Actual.Value);
+                    // Strong jobs = hawkish Fed = stronger USD = bearish gold
                     score -= Math.Sign(surprise) * 1.5;
                     Print($"[AI] NFP | ADP surprise: {surprise:+0.0;-0.0} → score {score:+0.0;-0.0}");
                 }
                 else Print("[AI] NFP | ADP precursor not yet published this week.");
             }
+            // ─── CPI ────────────────────────────────────────────────────────────────
             else if (title.Contains("cpi"))
             {
                 var ism = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("ISM Services") && e.Actual.HasValue);
@@ -249,6 +257,7 @@ namespace cAlgo.Robots
                 }
                 else Print("[AI] CPI | ISM Services precursor not yet published this week.");
             }
+            // ─── Retail Sales ───────────────────────────────────────────────────────
             else if (title.Contains("retail"))
             {
                 var conf = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("Consumer Confidence") && e.Actual.HasValue);
@@ -261,19 +270,21 @@ namespace cAlgo.Robots
                 else Print("[AI] Retail | Consumer Confidence not yet published this week.");
             }
 
+            // Resolve AI directional bias
             if      (score > 0) _aiBias = TradeType.Buy;
             else if (score < 0) _aiBias = TradeType.Sell;
             else
             {
-                Print("[AI] No precursor divergence detected. Defaulting bias to BUY.");
+                Print("[AI] No precursor divergence. Defaulting to BUY for BiasAccount.");
                 _aiBias = TradeType.Buy;
             }
 
+            // Hedge account inverts the bias
             _executionDirection = Role == AccountRole.HedgeAccount
                 ? (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy)
                 : _aiBias;
 
-            Print($"[AI] Bias: {_aiBias} | Role: {Role} | Executing: {_executionDirection}");
+            Print($"[AI] AI Bias: {_aiBias} | Account: {Role} | Will Execute: {_executionDirection}");
         }
 
         #endregion
@@ -287,25 +298,25 @@ namespace cAlgo.Robots
             if (_ordersPlaced) return;
             if (_executionDirection == null)
             {
-                Print("[Orders] No direction resolved — rerunning analysis.");
+                Print("[Orders] No direction resolved yet — rerunning analysis.");
                 LoadAndAnalyse();
                 if (_executionDirection == null) return;
             }
 
             _ordersPlaced = true;
 
-            // 0.01 lots per $4 risk capital (1:1000 leverage, XAUUSD)
+            // Lot sizing — mirror blueprint: 0.01 lots per $4 risk capital
             double lots   = (RiskCapital / 4.0) * 0.01;
             double volume = Symbol.NormalizeVolumeInUnits(
                 Symbol.QuantityToVolumeInUnits(lots), RoundingMode.ToNearest);
 
-            Print($"[Orders] {_executionDirection} | {lots:F2} lots | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}");
+            Print($"[Orders] Placing {_executionDirection} | {lots:F2} lots | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}");
 
             ExecuteMarketOrderAsync(_executionDirection.Value, SymbolName, volume,
-                Label, StopLoss, TakeProfit, Comment, result =>
+                Label, StopLoss, null, Comment, result =>
                 {
                     if (result.IsSuccessful)
-                        Print($"[Order] Executed — {result.Position.Id} @ {result.Position.EntryPrice}");
+                        Print($"[Order] Executed — Position {result.Position.Id} @ {result.Position.EntryPrice}");
                     else
                         Print("[Order] Failed: " + result.Error);
                 });
@@ -313,12 +324,14 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region Trailing Stop
+        #region Trailing Stop  (mirrored from News Trader Pro)
 
         private void UpdateTrailingStops()
         {
-            UpdateTrailForType(TradeType.Buy,  () => Symbol.Bid - TrailingStopStep * Symbol.PipSize);
-            UpdateTrailForType(TradeType.Sell, () => Symbol.Ask + TrailingStopStep * Symbol.PipSize);
+            UpdateTrailForType(TradeType.Buy,
+                () => Symbol.Bid - TrailingStopStep * Symbol.PipSize);
+            UpdateTrailForType(TradeType.Sell,
+                () => Symbol.Ask + TrailingStopStep * Symbol.PipSize);
         }
 
         private void UpdateTrailForType(TradeType type, Func<double> calcSL)
@@ -346,7 +359,7 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region UI
+        #region UI  (mirrored from News Trader Pro)
 
         private void UpdateUI(DateTime now)
         {
@@ -361,7 +374,7 @@ namespace cAlgo.Robots
             double margin001 = Symbol.GetEstimatedMargin(TradeType.Buy, Symbol.QuantityToVolumeInUnits(0.01));
             double reqMargin = (lots / 0.01) * margin001;
             DrawStaticText(LotSizeLabel,
-                $"Lots: {lots:F2} | Margin: ${reqMargin:F0} | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}",
+                $"Lot Size: {lots:F2} | Margin: ${reqMargin:F0} | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}",
                 VerticalAlignment.Top, HorizontalAlignment.Center, Color.DeepSkyBlue);
 
             DrawDashboard();
@@ -369,7 +382,8 @@ namespace cAlgo.Robots
 
         private void DrawDashboard()
         {
-            if (_dashboardPanel != null) Chart.RemoveControl(_dashboardPanel);
+            if (_dashboardPanel != null)
+                Chart.RemoveControl(_dashboardPanel);
 
             string eventName = _targetEvent != null ? _targetEvent.Title : $"No event at {NewsHour:D2}:{NewsMinute:D2}";
             string biasText  = _aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() + (_aiBias == TradeType.Buy ? " ▲" : " ▼") : "Analysing...";
@@ -402,20 +416,19 @@ namespace cAlgo.Robots
             });
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("Role:",     Role.ToString(), roleColor));
-            panel.AddChild(Row("Event:",    eventName,       Color.White));
-            panel.AddChild(Row("AI Bias:",  biasText,        biasColor));
-            panel.AddChild(Row("Execute:",  execText,        execColor));
+            panel.AddChild(Row("Account Role:", Role.ToString(),  roleColor));
+            panel.AddChild(Row("Event:",        eventName,        Color.White));
+            panel.AddChild(Row("AI Bias:",      biasText,         biasColor));
+            panel.AddChild(Row("Executing:",    execText,         execColor));
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("SL:",     $"{StopLoss} pips",                             Color.White));
-            panel.AddChild(Row("TP:",     $"{TakeProfit} pips",                           Color.White));
-            panel.AddChild(Row("Trail:",  $"{TrailingStopTrigger}/{TrailingStopStep}",    Color.White));
+            panel.AddChild(Row("SL:",     $"{StopLoss} pips  (trailing manages exit)", Color.White));
+            panel.AddChild(Row("Trigger:", $"{TrailingStopTrigger} pips",              Color.White));
+            panel.AddChild(Row("Trail:",   $"{TrailingStopStep} pips",                 Color.White));
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("Balance:", $"{Account.Balance:C}", Color.White));
-            panel.AddChild(Row("Equity:",  $"{Account.Equity:C}",
-                Account.Equity >= Account.Balance ? Color.LimeGreen : Color.OrangeRed));
+            panel.AddChild(Row("Balance:", $"{Account.Balance:C}",  Color.White));
+            panel.AddChild(Row("Equity:",  $"{Account.Equity:C}",   Account.Equity >= Account.Balance ? Color.LimeGreen : Color.OrangeRed));
 
             _dashboardPanel.Child = panel;
             Chart.AddControl(_dashboardPanel);
