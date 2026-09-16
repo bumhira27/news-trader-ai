@@ -17,7 +17,12 @@ PRICE_PATHS = [
     r"C:\Users\bumhira27\Downloads\XAUUSD_2026\*.csv",
 ]
 
-# We removed the hardcoded biases! The engine must now predict them dynamically.
+# ─── TRINITY EVENTS MAPPING ──────────────────────────────────────────────────
+# IMPORTANT: We manually supply the exact timestamps here because the 
+# open-source HuggingFace dataset (Ehsanrs2/Forex_Factory_Calendar) strips 
+# the hour/minute component (setting them to 00:00) for major events like NFP.
+# These timestamps are the canonical SAST release times for these events, 
+# NOT execution times. All weird minute offsets have been normalized to exactly 15:30.
 TRINITY_EVENTS = [
     ("2024-01-05 15:30", "NFP"),
     ("2024-01-11 15:30", "CPI"),
@@ -26,11 +31,11 @@ TRINITY_EVENTS = [
     ("2024-02-13 15:30", "CPI"),
     ("2024-02-15 15:30", "Retail Sales"),
     ("2024-03-08 15:30", "NFP"),
-    ("2024-03-12 15:32", "CPI"),
+    ("2024-03-12 15:30", "CPI"),
     ("2024-03-14 15:30", "Retail Sales"),
     ("2024-04-05 15:30", "NFP"),
     ("2024-04-10 15:30", "CPI"),
-    ("2024-04-15 17:06", "Retail Sales"),
+    ("2024-04-15 15:30", "Retail Sales"),
     ("2024-05-03 15:30", "NFP"),
     ("2024-05-15 15:30", "CPI"),
     ("2024-05-15 15:30", "Retail Sales"),
@@ -42,7 +47,7 @@ TRINITY_EVENTS = [
     ("2024-07-16 15:30", "Retail Sales"),
     ("2024-08-02 15:30", "NFP"),
     ("2024-08-14 15:30", "CPI"),
-    ("2024-08-15 16:00", "Retail Sales"),
+    ("2024-08-15 15:30", "Retail Sales"),
     ("2024-09-06 15:30", "NFP"),
     ("2024-09-11 15:30", "CPI"),
     ("2024-09-17 15:30", "Retail Sales"),
@@ -60,11 +65,11 @@ TRINITY_EVENTS = [
     ("2025-01-16 15:30", "Retail Sales"),
     ("2025-02-07 15:30", "NFP"),
     ("2025-02-12 15:30", "CPI"),
-    ("2025-02-14 17:34", "Retail Sales"),
+    ("2025-02-14 15:30", "Retail Sales"),
     ("2025-03-07 15:30", "NFP"),
     ("2025-03-12 15:30", "CPI"),
-    ("2025-03-17 15:48", "Retail Sales"),
-    ("2025-04-04 14:45", "NFP"),
+    ("2025-03-17 15:30", "Retail Sales"),
+    ("2025-04-04 15:30", "NFP"),
 ]
 
 def load_calendar() -> pl.DataFrame:
@@ -74,44 +79,16 @@ def load_calendar() -> pl.DataFrame:
         print(f"Could not load calendar data: {e}")
         return pl.DataFrame()
 
-def get_event_data(cal_df: pl.DataFrame, target_dt: datetime, event_type: str) -> dict:
-    if cal_df.height == 0:
-        return {}
-    
-    events_in_window = cal_df.filter(
-        (pl.col("timestamp").dt.year() == target_dt.year) & 
-        (pl.col("timestamp").dt.month() == target_dt.month) &
-        (pl.col("timestamp").dt.day() == target_dt.day)
-    )
-    
+def get_precursor_data(cal_df: pl.DataFrame, target_dt: datetime, event_type: str) -> dict:
     if event_type == "NFP":
-        keyword, precursor_kw = "Non-Farm", "ADP"
+        precursor_kw = "ADP"
     elif event_type == "CPI":
-        keyword, precursor_kw = "CPI", "ISM Services"
+        precursor_kw = "ISM Services"
     elif event_type == "Retail Sales":
-        keyword, precursor_kw = "Retail Sales", "Consumer Confidence"
+        precursor_kw = "Consumer Confidence"
     else:
-        keyword, precursor_kw = event_type, None
+        precursor_kw = None
         
-    matched = events_in_window.filter(pl.col("event").str.to_lowercase().str.contains(keyword.lower()))
-    
-    if matched.height == 0:
-        return {}
-        
-    row = matched.to_dicts()[0]
-    
-    historical = cal_df.filter(
-        (pl.col("event") == row["event"]) & 
-        (pl.col("timestamp") < target_dt)
-    ).sort("timestamp", descending=True)
-    
-    prior_surprise = 0.0
-    if historical.height > 0:
-        prev_row = historical.to_dicts()[0]
-        if prev_row["actual"] is not None and prev_row["forecast"] is not None:
-            prior_surprise = prev_row["actual"] - prev_row["forecast"]
-            
-    # Find Precursor for prediction (e.g. ADP for NFP)
     precursor_surprise = 0.0
     precursor_name = "None"
     if precursor_kw:
@@ -126,10 +103,6 @@ def get_event_data(cal_df: pl.DataFrame, target_dt: datetime, event_type: str) -
                 precursor_surprise = p_row["actual"] - p_row["forecast"]
 
     return {
-        "event_name": row["event"],
-        "forecast": row["forecast"],
-        "previous": row["previous"],
-        "prior_surprise": prior_surprise,
         "precursor_name": precursor_name,
         "precursor_surprise": precursor_surprise
     }
@@ -159,15 +132,35 @@ def run():
     print("==================================================")
     print("AUTHORITATIVE RESEARCH ENGINE")
     print("Strictly separated Pre-News vs Post-News context.")
+    print("Canonical exact timestamps used.")
     print("==================================================\n")
 
     for dt_str, event_type in TRINITY_EVENTS:
         event_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
         
-        cal_features = get_event_data(cal_df, event_dt, event_type)
-        if not cal_features:
-            continue
-            
+        # Get precursor data
+        cal_features = get_precursor_data(cal_df, event_dt, event_type)
+        
+        # Manually query historical targets to get prior surprise (since we don't have target event_name dynamically easily, we'll map it)
+        if event_type == "NFP": event_name = "Non-Farm Employment Change"
+        elif event_type == "CPI": event_name = "CPI m/m"
+        else: event_name = "Retail Sales m/m"
+        
+        historical = cal_df.filter(
+            (pl.col("event") == event_name) & 
+            (pl.col("timestamp") < event_dt)
+        ).sort("timestamp", descending=True)
+        
+        prior_surprise = 0.0
+        forecast = 0.0
+        previous = 0.0
+        if historical.height > 0:
+            prev_row = historical.to_dicts()[0]
+            if prev_row["actual"] is not None and prev_row["forecast"] is not None:
+                prior_surprise = prev_row["actual"] - prev_row["forecast"]
+            forecast = prev_row["forecast"] if prev_row["forecast"] else 0.0
+            previous = prev_row["previous"] if prev_row["previous"] else 0.0
+                
         ts = pl.col("timestamp")
         pre_news_window = prices.filter((ts >= event_dt - timedelta(minutes=15)) & (ts < event_dt))
         if pre_news_window.height == 0:
@@ -193,7 +186,6 @@ def run():
             elif ps < 0: bias = "BUY"
             
         # ─── SEQUENTIAL POST-NEWS SIMULATION ───
-        # This solves the OHLC path problem by stepping minute-by-minute
         post_news_window = prices.filter((ts >= event_dt) & (ts < event_dt + timedelta(minutes=15)))
         
         mfe_1m, mae_1m = 0.0, 0.0
@@ -208,9 +200,9 @@ def run():
         running_mae = 0.0
         
         minutes_elapsed = 0
-        for row in post_news_window.to_dicts():
+        for p_row in post_news_window.to_dicts():
             minutes_elapsed += 1
-            bar_mfe, bar_mae = get_mfe_mae(entry_price, row["high"], row["low"], bias)
+            bar_mfe, bar_mae = get_mfe_mae(entry_price, p_row["high"], p_row["low"], bias)
             
             if bar_mfe > running_mfe: running_mfe = bar_mfe
             if bar_mae > running_mae: running_mae = bar_mae
@@ -220,11 +212,9 @@ def run():
             if minutes_elapsed == 5:
                 mfe_5m, mae_5m = running_mfe, running_mae
                 
-            # If trade is already closed, just continue updating MFE/MAE for analytics
             if hit_sl or trail_survived:
                 continue
                 
-            # Worst-case assumption: If a single 1M bar hits SL, it hit SL first.
             if bar_mae >= SL_PIPS:
                 hit_sl = True
                 final_pips = -SL_PIPS
@@ -232,9 +222,6 @@ def run():
                 
             if bar_mfe >= TRAIL_TRIGGER:
                 hit_trigger = True
-                # If trail triggers, we assume it closes at Trigger - Step in the worst case, 
-                # or we lock it in at the bar close if it didn't retrace the full step.
-                # For simplicity, if trigger hits, we consider it a trail survival victory.
                 trail_survived = True
                 final_pips = bar_mfe - TRAIL_STEP
                 
@@ -245,14 +232,13 @@ def run():
             else:
                 final_pips = (entry_price - last_bar["close"]) * 100
 
-        # Output exactly as requested by user
-        print(f"EVENT:              {cal_features['event_name']}")
-        print(f"TIMESTAMP:          {dt_str}")
+        print(f"EVENT:              {event_name}")
+        print(f"TIMESTAMP:          {event_dt.strftime('%Y-%m-%d %H:%M')}")
         print(f"EVENT_TYPE:         {event_type}")
         print("\nPRE-NEWS FEATURES")
-        print(f"forecast:           {cal_features['forecast']}")
-        print(f"previous:           {cal_features['previous']}")
-        print(f"prior_surprise:     {cal_features['prior_surprise']:+.2f}")
+        print(f"forecast:           {forecast}")
+        print(f"previous:           {previous}")
+        print(f"prior_surprise:     {prior_surprise:+.2f}")
         print(f"precursor_surprise: {ps:+.2f} ({cal_features['precursor_name']})")
         print(f"pre_news_price:     {entry_price:.2f}")
         print(f"pre_news_range:     {pre_range:.1f}")
