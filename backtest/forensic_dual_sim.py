@@ -42,11 +42,11 @@ KNOWN_RESULTS = [
     ("2024-02-13 15:30", "CPI",          "SELL", "LOSS"),
     ("2024-02-15 15:30", "Retail Sales", "SELL", "LOSS"),
     ("2024-03-08 15:30", "NFP",          "BUY",  "LOSS"),
-    ("2024-03-12 15:32", "CPI",          "BUY",  "WIN"),
+    ("2024-03-12 15:30", "CPI",          "BUY",  "WIN"),
     ("2024-03-14 15:30", "Retail Sales", "BUY",  "LOSS"),
     ("2024-04-05 15:30", "NFP",          "BUY",  "WIN"),
     ("2024-04-10 15:30", "CPI",          "SELL", "WIN"),
-    ("2024-04-15 17:06", "Retail Sales", "BUY",  "LOSS"),
+    ("2024-04-15 15:30", "Retail Sales", "BUY",  "LOSS"),
     ("2024-05-03 15:30", "NFP",          "SELL", "WIN"),
     ("2024-05-15 15:30", "CPI",          "BUY",  "WIN"),
     ("2024-05-15 15:30", "Retail Sales", "BUY",  "WIN"),
@@ -58,7 +58,7 @@ KNOWN_RESULTS = [
     ("2024-07-16 15:30", "Retail Sales", "SELL", "WIN"),
     ("2024-08-02 15:30", "NFP",          "BUY",  "WIN"),
     ("2024-08-14 15:30", "CPI",          "BUY",  "WIN"),
-    ("2024-08-15 16:00", "Retail Sales", "SELL", "WIN"),
+    ("2024-08-15 15:30", "Retail Sales", "SELL", "WIN"),
     ("2024-09-06 15:30", "NFP",          "SELL", "LOSS"),
     ("2024-09-11 15:30", "CPI",          "BUY",  "LOSS"),
     ("2024-09-17 15:30", "Retail Sales", "SELL", "WIN"),
@@ -76,11 +76,11 @@ KNOWN_RESULTS = [
     ("2025-01-16 15:30", "Retail Sales", "BUY",  "WIN"),
     ("2025-02-07 15:30", "NFP",          "BUY",  "LOSS"),
     ("2025-02-12 15:30", "CPI",          "SELL", "WIN"),
-    ("2025-02-14 17:34", "Retail Sales", "BUY",  "WIN"),
+    ("2025-02-14 15:30", "Retail Sales", "BUY",  "WIN"),
     ("2025-03-07 15:30", "NFP",          "SELL", "WIN"),
     ("2025-03-12 15:30", "CPI",          "BUY",  "WIN"),
-    ("2025-03-17 15:48", "Retail Sales", "SELL", "WIN"),
-    ("2025-04-04 14:45", "NFP",          "SELL", "WIN"),
+    ("2025-03-17 15:30", "Retail Sales", "SELL", "WIN"),
+    ("2025-04-04 15:30", "NFP",          "SELL", "WIN"),
 ]
 
 def calc_lots(capital: float) -> float:
@@ -96,29 +96,50 @@ def simulate_trade(prices: pl.DataFrame, event_dt: datetime, bias: str) -> dict:
 
     entry_price = entry_bar["close"][0]
 
-    window = prices.filter((ts >= event_dt) & (ts <= event_dt + timedelta(minutes=10)))
+    window = prices.filter((ts >= event_dt) & (ts <= event_dt + timedelta(minutes=15)))
     if window.height == 0:
         return {"pips_won": 0, "outcome": "NO_DATA"}
 
-    spike = window.sort("high", descending=True).head(1).to_dicts()[0]
+    trail_sl = -SL_PIPS
+    trade_active = True
+    final_pips = 0.0
 
-    if bias == "BUY":
-        favorable = (spike["high"] - entry_price) * 100
-        adverse   = (entry_price - spike["low"])  * 100
-    else:
-        favorable = (entry_price - spike["low"])  * 100
-        adverse   = (spike["high"] - entry_price) * 100
+    for p_row in window.to_dicts():
+        if bias == "BUY":
+            pips_high = (p_row["high"] - entry_price) * 100
+            pips_low = (p_row["low"] - entry_price) * 100
+            pips_close = (p_row["close"] - entry_price) * 100
+        else:
+            pips_high = (entry_price - p_row["low"]) * 100
+            pips_low = (entry_price - p_row["high"]) * 100
+            pips_close = (entry_price - p_row["close"]) * 100
+            
+        if trade_active:
+            # Check adverse first (conservative intrabar path)
+            if pips_low <= trail_sl:
+                trade_active = False
+                final_pips = trail_sl
+            
+            # If survived, check favorable and trail
+            if trade_active and pips_high >= TRAIL_TRIGGER:
+                new_trail = pips_high - TRAIL_STEP
+                if new_trail > trail_sl:
+                    trail_sl = new_trail
+                    
+                # Check retracement within same bar
+                if pips_close <= trail_sl:
+                    trade_active = False
+                    final_pips = trail_sl
+                    
+    if trade_active and window.height > 0:
+        last_bar = window.to_dicts()[-1]
+        if bias == "BUY":
+            final_pips = (last_bar["close"] - entry_price) * 100
+        else:
+            final_pips = (entry_price - last_bar["close"]) * 100
 
-    if adverse >= SL_PIPS:
-        return {"pips_won": -SL_PIPS, "outcome": "LOSS"}
-
-    if favorable >= TRAIL_TRIGGER:
-        locked_pips = favorable - TRAIL_STEP
-        return {"pips_won": max(locked_pips, 0), "outcome": "WIN"}
-
-    pips = (spike["close"] - entry_price) * 100 if bias == "BUY" else (entry_price - spike["close"]) * 100
-    outcome = "WIN" if pips > 0 else "LOSS"
-    return {"pips_won": round(pips, 1), "outcome": outcome}
+    outcome = "WIN" if final_pips > 0 else "LOSS"
+    return {"pips_won": round(final_pips, 1), "outcome": outcome}
 
 def run():
     print("Loading price data...")

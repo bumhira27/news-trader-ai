@@ -9,13 +9,15 @@
 
 | Metric | Value |
 |---|---|
-| Final Compounded Pot | **$227,093.06** |
-| Return on Capital | **+22,609%** |
+| Final Compounded Pot | **$30,249.65** |
+| Return on Capital | **+2,925%** |
 | Total Trades | 46 |
 | Backtest Period | Jan 2024 – Apr 2025 |
 | Stop Loss | 300 pips |
 | Trailing Trigger | 500 pips |
 | Trailing Step | 200 pips |
+
+> **Note on Backtest Rigor:** These results are generated using a conservative minute-by-minute sequential state machine. Intrabar paths strictly assume adverse excursions (Stop Losses) hit *before* favorable ones (Trail Triggers), and trailing stops correctly require full retracement steps to exit. Timestamps are strictly locked to canonical economic calendar releases (e.g. 15:30) to eliminate any look-ahead bias from observed price action.
 
 ### Dual-Terminal Asymmetric Straddle Setup
 - **Terminal 1 (BiasAccount):** Base Risk **$300** (Trades AI predicted direction)
@@ -36,18 +38,18 @@ Because the risk is strictly capped to the allocated block ($450 total exposure)
 
 | Date | Event | Multiplier | Bias Lots | Hedge Lots | Running Pot |
 |---|---|---|---|---|---|
-| 2024-01-05 | NFP | 1x | 0.75 | 0.38 | **$1,588.75** |
-| 2024-04-10 | CPI | 2x | 1.50 | 0.75 | **$4,238.48** |
-| 2024-05-15 | Retail Sales | 3x | 2.25 | 1.12 | **$10,861.73** |
-| 2024-06-18 | Retail Sales | 6x | 4.50 | 2.25 | **$16,283.48** |
-| 2024-07-16 | Retail Sales | 10x | 7.50 | 3.75 | **$34,368.23** |
-| 2024-08-14 | CPI | 17x | 12.75 | 6.38 | **$56,837.48** |
-| 2024-10-10 | CPI | 26x | 19.50 | 9.75 | **$91,522.76** |
-| 2024-11-13 | CPI | 30x | 22.50 | 11.25 | **$104,460.09** |
-| 2025-01-10 | NFP | 42x | 31.50 | 15.75 | **$128,665.14** |
-| 2025-02-14 | Retail Sales | 50x | 37.50 | 18.75 | **$188,210.38** |
-| 2025-03-07 | NFP | 63x | 47.25 | 23.62 | **$205,662.56** |
-| 2025-04-04 | NFP | 82x | 61.50 | 30.75 | **$227,093.06** |
+| 2024-01-05 | NFP | 1x | 0.75 | 0.38 | **$1,838.50** |
+| 2024-04-10 | CPI | 1x | 0.75 | 0.38 | **$2,198.48** |
+| 2024-06-12 | CPI | 2x | 1.50 | 0.75 | **$7,055.00** |
+| 2024-07-11 | CPI | 3x | 2.25 | 1.12 | **$11,528.92** |
+| 2024-08-02 | NFP | 4x | 3.00 | 1.50 | **$17,471.92** |
+| 2024-08-15 | Retail Sales | 7x | 5.25 | 2.62 | **$21,109.42** |
+| 2024-10-04 | NFP | 6x | 4.50 | 2.25 | **$24,602.92** |
+| 2024-11-13 | CPI | 7x | 5.25 | 2.62 | **$24,716.17** |
+| 2024-12-06 | NFP | 9x | 6.75 | 3.38 | **$29,165.92** |
+| 2025-02-12 | CPI | 8x | 6.00 | 3.00 | **$30,064.86** |
+| 2025-03-07 | NFP | 11x | 8.25 | 4.12 | **$32,491.40** |
+| 2025-04-04 | NFP | 11x | 8.25 | 4.12 | **$30,249.65** |
 
 > Full simulation code: [`backtest/forensic_dual_sim.py`](backtest/forensic_dual_sim.py)
 
