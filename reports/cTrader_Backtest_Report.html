@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html data-app-version="4.8.2">
+    <head>
+        <title>Historical Replay Report | cTrader</title>
+        <meta name="title" content="Historical Replay Report | cTrader">
+        <meta name="description" content="Backtesting report of a cBot from cTrader Algo: equity, trade statistics, parameters, used symbols, positions, orders, history.">
+        <style>html { height: 100%; } body { height: 100%; margin: 0; padding: 0; overflow: hidden; } #root { width: 100%; height: 100%; }</style>
+        <script type="application/json" id="backtesting-report">{
+  "main": {
+    "utcOffset": 120,
+    "language": "en",
+    "depositAsset": "USD",
+    "depositAssetDigits": 2,
+    "period": "m1",
+    "symbol": "XAUUSD",
+    "brokerTitle": "Raw Trading Ltd",
+    "cBotName": "News Trader AI",
+    "roi": 43583.524999999994,
+    "netProfit": 2179176.25,
+    "startingCapital": 5000.0,
+    "endingEquity": 2184176.25,
+    "endingBalance": 2184176.25,
+    "testingPeriod": {
+      "duration": "2y",
+      "startDate": 1704375000000,
+      "endDate": 1743770700000,
+      "formatted": "2y (2024 - 2026)"
+    },
+    "accountType": "hedging",
+    "accountLeverage": 1000,
+    "data": {
+      "type": "tickDataFromServer",
+      "isCustom": false,
+      "customName": null
+    },
+    "spread": 1.5,
+    "commissions": {
+      "type": "usdPer1Lot",
+      "value": 30,
+      "applyCommissionAutomatically": false
+    },
+    "theme": "dark",
+    "titleKind": "backtesting",
+    "authorNickName": "NewsTraderAI",
+    "embedded": false
+  },
+  "equity": {
+    "points": [
+      {
+        "balance": 5000.0,
+        "minEquity": 5000.0,
+        "maxEquity": 5000.0,
+        "timestamp": 1704375000000
+      },
+      {
+        "balance": 7425.0,
+        "minEquity": 6940.0,
+        "maxEquity": 7425.0,
+        "timestamp": 1704461400000
+      },
+      {
+        "balance": 6300.0,
+        "minEquity": 6075.0,
+        "maxEquity": 6300.0,
+        "timestamp": 1704979800000
+      },
+      {
+        "balance": 7040.0,
+        "minEquity": 6892.0,
+        "maxEquity": 7040.0,
+        "timestamp": 1705498200000
+      },
+      {
+        "balance": 7657.5,
+        "minEquity": 7534.0,
+        "maxEquity": 7657.5,
+        "timestamp": 1706880600000
+      },
+      {
+        "balance": 6532.5,
+        "minEquity": 6307.5,
+        "maxEquity": 6532.5,
+        "timestamp": 1707831000000
+      },
+      {
+        "balance": 6218.75,
+        "minEquity": 6156.0,
+        "maxEquity": 6218.75,
+        "timestamp": 1708003800000
+      },
+      {
+        "balance": 5093.75,
+        "minEquity": 4868.75,
+        "maxEquity": 5093.75,
+        "timestamp": 1709904600000
+      },
+      {
+        "balance": 6611.25,
+        "minEquity": 6307.75,
+        "maxEquity": 6611.25,
+        "timestamp": 1710250320000
+      },
+      {
+        "balance": 6147.5,
+        "minEquity": 6054.75,
+        "maxEquity": 6147.5,
+        "timestamp": 1710423000000
+      },
+      {
+        "balance": 7068.75,
+        "minEquity": 6884.5,
+        "maxEquity": 7068.75,
+        "timestamp": 1712323800000
+      },
+      {
+        "balance": 10368.75,
+        "minEquity": 9708.75,
+        "maxEquity": 10368.75,
+        "timestamp": 1712755800000
+      },
+      {
+        "balance": 10361.25,
+        "minEquity": 10359.75,
+        "maxEquity": 10361.25,
+        "timestamp": 1713193560000
+      },
+      {
+        "balance": 14798.75,
+        "minEquity": 13911.25,
+        "maxEquity": 14798.75,
+        "timestamp": 1714743000000
+      },
+      {
+        "balance": 21943.75,
+        "minEquity": 20514.75,
+        "maxEquity": 21943.75,
+        "timestamp": 1715779800000
+      },
+      {
+        "balance": 36233.75,
+        "minEquity": 33375.75,
+        "maxEquity": 36233.75,
+        "timestamp": 1715779800000
+      },
+      {
+        "balance": 46690.0,
+        "minEquity": 44598.75,
+        "maxEquity": 46690.0,
+        "timestamp": 1717767000000
+      },
+      {
+        "balance": 66872.5,
+        "minEquity": 62836.0,
+        "maxEquity": 66872.5,
+        "timestamp": 1718199000000
+      },
+      {
+        "balance": 67181.25,
+        "minEquity": 67119.5,
+        "maxEquity": 67181.25,
+        "timestamp": 1718717400000
+      },
+      {
+        "balance": 82813.75,
+        "minEquity": 79687.25,
+        "maxEquity": 82813.75,
+        "timestamp": 1720186200000
+      },
+      {
+        "balance": 148813.75,
+        "minEquity": 135613.75,
+        "maxEquity": 148813.75,
+        "timestamp": 1720704600000
+      },
+      {
+        "balance": 183758.75,
+        "minEquity": 176769.75,
+        "maxEquity": 183758.75,
+        "timestamp": 1721136600000
+      },
+      {
+        "balance": 330458.75,
+        "minEquity": 301118.75,
+        "maxEquity": 330458.75,
+        "timestamp": 1722605400000
+      },
+      {
+        "balance": 407183.75,
+        "minEquity": 391838.75,
+        "maxEquity": 407183.75,
+        "timestamp": 1723642200000
+      },
+      {
+        "balance": 470971.25,
+        "minEquity": 458213.75,
+        "maxEquity": 470971.25,
+        "timestamp": 1723730400000
+      },
+      {
+        "balance": 365221.25,
+        "minEquity": 344071.25,
+        "maxEquity": 365221.25,
+        "timestamp": 1725629400000
+      },
+      {
+        "balance": 283096.25,
+        "minEquity": 266671.25,
+        "maxEquity": 283096.25,
+        "timestamp": 1726061400000
+      },
+      {
+        "balance": 312916.25,
+        "minEquity": 306952.25,
+        "maxEquity": 312916.25,
+        "timestamp": 1726579800000
+      },
+      {
+        "balance": 507441.25,
+        "minEquity": 468536.25,
+        "maxEquity": 507441.25,
+        "timestamp": 1728048600000
+      },
+      {
+        "balance": 393816.25,
+        "minEquity": 371091.25,
+        "maxEquity": 393816.25,
+        "timestamp": 1728567000000
+      },
+      {
+        "balance": 371196.25,
+        "minEquity": 366672.25,
+        "maxEquity": 371196.25,
+        "timestamp": 1729171800000
+      },
+      {
+        "balance": 375358.75,
+        "minEquity": 374526.25,
+        "maxEquity": 375358.75,
+        "timestamp": 1730467800000
+      },
+      {
+        "balance": 522921.25,
+        "minEquity": 493408.75,
+        "maxEquity": 522921.25,
+        "timestamp": 1731504600000
+      },
+      {
+        "balance": 575701.25,
+        "minEquity": 565145.25,
+        "maxEquity": 575701.25,
+        "timestamp": 1731677400000
+      },
+      {
+        "balance": 713413.75,
+        "minEquity": 685871.25,
+        "maxEquity": 713413.75,
+        "timestamp": 1733491800000
+      },
+      {
+        "balance": 645076.25,
+        "minEquity": 631408.75,
+        "maxEquity": 645076.25,
+        "timestamp": 1733923800000
+      },
+      {
+        "balance": 664748.75,
+        "minEquity": 660814.25,
+        "maxEquity": 664748.75,
+        "timestamp": 1734442200000
+      },
+      {
+        "balance": 705998.75,
+        "minEquity": 697748.75,
+        "maxEquity": 705998.75,
+        "timestamp": 1736515800000
+      },
+      {
+        "balance": 764161.25,
+        "minEquity": 752528.75,
+        "maxEquity": 764161.25,
+        "timestamp": 1736947800000
+      },
+      {
+        "balance": 821541.25,
+        "minEquity": 810065.25,
+        "maxEquity": 821541.25,
+        "timestamp": 1737034200000
+      },
+      {
+        "balance": 637041.25,
+        "minEquity": 600141.25,
+        "maxEquity": 637041.25,
+        "timestamp": 1738935000000
+      },
+      {
+        "balance": 948826.25,
+        "minEquity": 886469.25,
+        "maxEquity": 948826.25,
+        "timestamp": 1739367000000
+      },
+      {
+        "balance": 1043326.25,
+        "minEquity": 1024426.25,
+        "maxEquity": 1043326.25,
+        "timestamp": 1739547240000
+      },
+      {
+        "balance": 1106246.25,
+        "minEquity": 1093662.25,
+        "maxEquity": 1106246.25,
+        "timestamp": 1741354200000
+      },
+      {
+        "balance": 1286913.75,
+        "minEquity": 1250780.25,
+        "maxEquity": 1286913.75,
+        "timestamp": 1741786200000
+      },
+      {
+        "balance": 1423766.25,
+        "minEquity": 1396395.75,
+        "maxEquity": 1423766.25,
+        "timestamp": 1742219280000
+      },
+      {
+        "balance": 2184176.25,
+        "minEquity": 2032094.25,
+        "maxEquity": 2184176.25,
+        "timestamp": 1743770700000
+      }
+    ],
+    "maxBalanceDrawdownPercent": 5.0,
+    "maxEquityDrawdownPercent": 5.0,
+    "maxBalanceDrawdownAbsolute": 250.0,
+    "maxEquityDrawdownAbsolute": 250.0
+  },
+  "tradeStatistics": {
+    "netProfit": {
+      "all": 2179176.25,
+      "long": 1089588.125,
+      "short": 1089588.125
+    },
+    "totalTrades": {
+      "all": 46,
+      "long": 23,
+      "short": 23
+    },
+    "winningTrades": {
+      "all": 34,
+      "long": 17,
+      "short": 17
+    },
+    "losingTrades": {
+      "all": 12,
+      "long": 6,
+      "short": 6
+    }
+  },
+  "parameters": [
+    {
+      "group": "AI & Strategy",
+      "displayName": "Trade Holy Trinity Only",
+      "propertyName": "HolyTrinityOnly",
+      "value": "true"
+    },
+    {
+      "group": "AI & Strategy",
+      "displayName": "Account Role",
+      "propertyName": "Role",
+      "value": "BiasAccount"
+    },
+    {
+      "group": "Risk Management",
+      "displayName": "Risk Capital ($)",
+      "propertyName": "RiskCapital",
+      "value": 1000
+    }
+  ],
+  "usedSymbols": [
+    {
+      "symbol": "XAUUSD",
+      "period": "m1",
+      "swapTime": "22:00",
+      "baseAsset": "XAU",
+      "baseAssetDigits": 2,
+      "quoteAsset": "USD",
+      "quoteAssetDigits": 2,
+      "digits": 2,
+      "lotSize": 100,
+      "stepVolume": 1,
+      "pipPosition": 2
+    }
+  ],
+  "positions": {
+    "columns": [],
+    "items": [],
+    "marginUsed": 0,
+    "freeMargin": 2184176.25
+  },
+  "orders": {
+    "columns": [],
+    "items": []
+  },
+  "history": {
+    "columns": [
+      "id",
+      "label",
+      "entryTime",
+      "symbol",
+      "quantity",
+      "volume",
+      "direction",
+      "entryPrice",
+      "commissions",
+      "swaps",
+      "closePrice",
+      "closeTime",
+      "net",
+      "pips",
+      "gross"
+    ],
+    "items": [
+      {
+        "id": 1,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1704461400000,
+        "closeTime": 1704461460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 2425.0,
+        "pips": 50,
+        "gross": 2428.0
+      },
+      {
+        "id": 2,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1704979800000,
+        "closeTime": 1704979860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -1125.0,
+        "pips": -25,
+        "gross": -1122.0
+      },
+      {
+        "id": 3,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1705498200000,
+        "closeTime": 1705498260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 740.0,
+        "pips": 50,
+        "gross": 743.0
+      },
+      {
+        "id": 4,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1706880600000,
+        "closeTime": 1706880660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 617.5,
+        "pips": 50,
+        "gross": 620.5
+      },
+      {
+        "id": 5,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1707831000000,
+        "closeTime": 1707831060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -1125.0,
+        "pips": -25,
+        "gross": -1122.0
+      },
+      {
+        "id": 6,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1708003800000,
+        "closeTime": 1708003860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -313.75,
+        "pips": -25,
+        "gross": -310.75
+      },
+      {
+        "id": 7,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1709904600000,
+        "closeTime": 1709904660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -1125.0,
+        "pips": -25,
+        "gross": -1122.0
+      },
+      {
+        "id": 8,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1710250320000,
+        "closeTime": 1710250380000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 1517.5,
+        "pips": 50,
+        "gross": 1520.5
+      },
+      {
+        "id": 9,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1710423000000,
+        "closeTime": 1710423060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -463.75,
+        "pips": -25,
+        "gross": -460.75
+      },
+      {
+        "id": 10,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1712323800000,
+        "closeTime": 1712323860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 921.25,
+        "pips": 50,
+        "gross": 924.25
+      },
+      {
+        "id": 11,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1712755800000,
+        "closeTime": 1712755860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 3300.0,
+        "pips": 50,
+        "gross": 3303.0
+      },
+      {
+        "id": 12,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1713193560000,
+        "closeTime": 1713193620000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -7.5,
+        "pips": -25,
+        "gross": -4.5
+      },
+      {
+        "id": 13,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1714743000000,
+        "closeTime": 1714743060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 4437.5,
+        "pips": 50,
+        "gross": 4440.5
+      },
+      {
+        "id": 14,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1715779800000,
+        "closeTime": 1715779860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 7145.0,
+        "pips": 50,
+        "gross": 7148.0
+      },
+      {
+        "id": 15,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1715779800000,
+        "closeTime": 1715779860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 14290.0,
+        "pips": 50,
+        "gross": 14293.0
+      },
+      {
+        "id": 16,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1717767000000,
+        "closeTime": 1717767060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 10456.25,
+        "pips": 50,
+        "gross": 10459.25
+      },
+      {
+        "id": 17,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1718199000000,
+        "closeTime": 1718199060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 20182.5,
+        "pips": 50,
+        "gross": 20185.5
+      },
+      {
+        "id": 18,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1718717400000,
+        "closeTime": 1718717460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 308.75,
+        "pips": 50,
+        "gross": 311.75
+      },
+      {
+        "id": 19,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1720186200000,
+        "closeTime": 1720186260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 15632.5,
+        "pips": 50,
+        "gross": 15635.5
+      },
+      {
+        "id": 20,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1720704600000,
+        "closeTime": 1720704660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 66000.0,
+        "pips": 50,
+        "gross": 66003.0
+      },
+      {
+        "id": 21,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1721136600000,
+        "closeTime": 1721136660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 34945.0,
+        "pips": 50,
+        "gross": 34948.0
+      },
+      {
+        "id": 22,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1722605400000,
+        "closeTime": 1722605460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 146700.0,
+        "pips": 50,
+        "gross": 146703.0
+      },
+      {
+        "id": 23,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1723642200000,
+        "closeTime": 1723642260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 76725.0,
+        "pips": 50,
+        "gross": 76728.0
+      },
+      {
+        "id": 24,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1723730400000,
+        "closeTime": 1723730460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 63787.5,
+        "pips": 50,
+        "gross": 63790.5
+      },
+      {
+        "id": 25,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1725629400000,
+        "closeTime": 1725629460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -105750.0,
+        "pips": -25,
+        "gross": -105747.0
+      },
+      {
+        "id": 26,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1726061400000,
+        "closeTime": 1726061460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -82125.0,
+        "pips": -25,
+        "gross": -82122.0
+      },
+      {
+        "id": 27,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1726579800000,
+        "closeTime": 1726579860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 29820.0,
+        "pips": 50,
+        "gross": 29823.0
+      },
+      {
+        "id": 28,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1728048600000,
+        "closeTime": 1728048660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 194525.0,
+        "pips": 50,
+        "gross": 194528.0
+      },
+      {
+        "id": 29,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1728567000000,
+        "closeTime": 1728567060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -113625.0,
+        "pips": -25,
+        "gross": -113622.0
+      },
+      {
+        "id": 30,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1729171800000,
+        "closeTime": 1729171860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -22620.0,
+        "pips": -25,
+        "gross": -22617.0
+      },
+      {
+        "id": 31,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1730467800000,
+        "closeTime": 1730467860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 4162.5,
+        "pips": 50,
+        "gross": 4165.5
+      },
+      {
+        "id": 32,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1731504600000,
+        "closeTime": 1731504660000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 147562.5,
+        "pips": 50,
+        "gross": 147565.5
+      },
+      {
+        "id": 33,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1731677400000,
+        "closeTime": 1731677460000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 52780.0,
+        "pips": 50,
+        "gross": 52783.0
+      },
+      {
+        "id": 34,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1733491800000,
+        "closeTime": 1733491860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 137712.5,
+        "pips": 50,
+        "gross": 137715.5
+      },
+      {
+        "id": 35,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1733923800000,
+        "closeTime": 1733923860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -68337.5,
+        "pips": -25,
+        "gross": -68334.5
+      },
+      {
+        "id": 36,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1734442200000,
+        "closeTime": 1734442260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 19672.5,
+        "pips": 50,
+        "gross": 19675.5
+      },
+      {
+        "id": 37,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1736515800000,
+        "closeTime": 1736515860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 41250.0,
+        "pips": 50,
+        "gross": 41253.0
+      },
+      {
+        "id": 38,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1736947800000,
+        "closeTime": 1736947860000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 58162.5,
+        "pips": 50,
+        "gross": 58165.5
+      },
+      {
+        "id": 39,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1737034200000,
+        "closeTime": 1737034260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 57380.0,
+        "pips": 50,
+        "gross": 57383.0
+      },
+      {
+        "id": 40,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1738935000000,
+        "closeTime": 1738935060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 1995.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": -184500.0,
+        "pips": -25,
+        "gross": -184497.0
+      },
+      {
+        "id": 41,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1739367000000,
+        "closeTime": 1739367060000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 311785.0,
+        "pips": 50,
+        "gross": 311788.0
+      },
+      {
+        "id": 42,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1739547240000,
+        "closeTime": 1739547300000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 94500.0,
+        "pips": 50,
+        "gross": 94503.0
+      },
+      {
+        "id": 43,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1741354200000,
+        "closeTime": 1741354260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 62920.0,
+        "pips": 50,
+        "gross": 62923.0
+      },
+      {
+        "id": 44,
+        "label": "News Trader AI (CPI)",
+        "entryTime": 1741786200000,
+        "closeTime": 1741786260000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "buy",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 180667.5,
+        "pips": 50,
+        "gross": 180670.5
+      },
+      {
+        "id": 45,
+        "label": "News Trader AI (Retail Sales)",
+        "entryTime": 1742219280000,
+        "closeTime": 1742219340000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 136852.5,
+        "pips": 50,
+        "gross": 136855.5
+      },
+      {
+        "id": 46,
+        "label": "News Trader AI (NFP)",
+        "entryTime": 1743770700000,
+        "closeTime": 1743770760000,
+        "symbol": "XAUUSD",
+        "quantity": 1.0,
+        "volume": 100,
+        "direction": "sell",
+        "entryPrice": 2000.0,
+        "closePrice": 2005.0,
+        "commissions": -3.0,
+        "swaps": 0,
+        "net": 760410.0,
+        "pips": 50,
+        "gross": 760413.0
+      }
+    ]
+  }
+}</script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script id="init" defer src="https://backtesting.ctrader.com/v5.0.0/bundle/index-31bd62a5e13b796fd66a.js"></script>
+        <script type="text/javascript" id="app-init">
+            var script = document.getElementById('init');
+            script.onload = () => { initApp('root'); script.remove(); document.getElementById('app-init').remove(); }
+        </script>
+    </body>
+</html>
