@@ -2,83 +2,54 @@
 
 > Autonomous XAUUSD M1 News Scalper — C# execution engine with native AI heuristics, built on cTrader.
 
-## Backtest Results (2024 – 2025)
+## Live Deployment Simulation (2024 – 2025)
 
 **Strategy:** Holy Trinity (NFP, CPI, Retail Sales) | **Instrument:** XAUUSD | **Timeframe:** M1
-**Starting Capital:** $5,000 | **Compounding:** Activated at $10,000
+**Starting Capital:** $1,000 | **Compounding:** 1x multiplier added every +$3,000 in total pot profit
 
 | Metric | Value |
 |---|---|
-| Final Compounded Pot | **$2,184,176.25** |
-| Return on Capital | **+43,583%** |
+| Final Compounded Pot | **$227,093.06** |
+| Return on Capital | **+22,609%** |
 | Total Trades | 46 |
 | Backtest Period | Jan 2024 – Apr 2025 |
 | Stop Loss | 300 pips |
 | Trailing Trigger | 500 pips |
 | Trailing Step | 200 pips |
 
+### Dual-Terminal Asymmetric Straddle Setup
+- **Terminal 1 (BiasAccount):** Base Risk **$300** (Trades AI predicted direction)
+- **Terminal 2 (HedgeAccount):** Base Risk **$150** (Trades opposite direction)
+
 ### Performance by Event
 
-| Event | Trades | Wins | Losses | Win Rate | Total Produced |
-|---|---|---|---|---|---|
-| NFP | 16 | 13 | 3 | 81.3% | $1,090,795 |
-| CPI | 15 | 10 | 5 | 66.7% | $606,710 |
-| Retail Sales | 15 | 11 | 4 | 73.3% | $481,671 |
-| **Overall** | **46** | **34** | **12** | **73.9%** | **$2,179,176** |
-
-### Full Trade History
-
-| Date & Time | Event | AI Bias | Net P&L | Total Pot |
+| Event | Trades | Wins | Losses | Win Rate |
 |---|---|---|---|---|
-| 2024-01-05 15:30 | NFP | SELL | +$2,425.00 | $7,425.00 |
-| 2024-01-11 15:30 | CPI | SELL | -$1,125.00 | $6,300.00 |
-| 2024-01-17 15:30 | Retail Sales | SELL | +$740.00 | $7,040.00 |
-| 2024-02-02 15:30 | NFP | BUY | +$617.50 | $7,657.50 |
-| 2024-02-13 15:30 | CPI | SELL | -$1,125.00 | $6,532.50 |
-| 2024-02-15 15:30 | Retail Sales | SELL | -$313.75 | $6,218.75 |
-| 2024-03-08 15:30 | NFP | BUY | -$1,125.00 | $5,093.75 |
-| 2024-03-12 15:32 | CPI | BUY | +$1,517.50 | $6,611.25 |
-| 2024-03-14 15:30 | Retail Sales | BUY | -$463.75 | $6,147.50 |
-| 2024-04-05 15:30 | NFP | BUY | +$921.25 | $7,068.75 |
-| ⭐ **COMPOUNDING ACTIVATED — POT CROSSED $10,000** | | | | |
-| 2024-04-10 15:30 | CPI | SELL | +$3,300.00 | $10,368.75 |
-| 2024-04-15 17:06 | Retail Sales | BUY | -$7.50 | $10,361.25 |
-| 2024-05-03 15:30 | NFP | SELL | +$4,437.50 | $14,798.75 |
-| 2024-05-15 15:30 | CPI | BUY | +$7,145.00 | $21,943.75 |
-| 2024-05-15 15:30 | Retail Sales | BUY | +$14,290.00 | $36,233.75 |
-| 2024-06-07 15:30 | NFP | BUY | +$10,456.25 | $46,690.00 |
-| 2024-06-12 15:30 | CPI | BUY | +$20,182.50 | $66,872.50 |
-| 2024-06-18 15:30 | Retail Sales | SELL | +$308.75 | $67,181.25 |
-| 2024-07-05 15:30 | NFP | BUY | +$15,632.50 | $82,813.75 |
-| 2024-07-11 15:30 | CPI | BUY | +$66,000.00 | $148,813.75 |
-| 2024-07-16 15:30 | Retail Sales | SELL | +$34,945.00 | $183,758.75 |
-| 2024-08-02 15:30 | NFP | BUY | +$146,700.00 | $330,458.75 |
-| 2024-08-14 15:30 | CPI | BUY | +$76,725.00 | $407,183.75 |
-| 2024-08-15 16:00 | Retail Sales | SELL | +$63,787.50 | $470,971.25 |
-| 2024-09-06 15:30 | NFP | SELL | -$105,750.00 | $365,221.25 |
-| 2024-09-11 15:30 | CPI | BUY | -$82,125.00 | $283,096.25 |
-| 2024-09-17 15:30 | Retail Sales | SELL | +$29,820.00 | $312,916.25 |
-| 2024-10-04 15:30 | NFP | SELL | +$194,525.00 | $507,441.25 |
-| 2024-10-10 15:30 | CPI | BUY | -$113,625.00 | $393,816.25 |
-| 2024-10-17 15:30 | Retail Sales | BUY | -$22,620.00 | $371,196.25 |
-| 2024-11-01 15:30 | NFP | SELL | +$4,162.50 | $375,358.75 |
-| 2024-11-13 15:30 | CPI | BUY | +$147,562.50 | $522,921.25 |
-| 2024-11-15 15:30 | Retail Sales | SELL | +$52,780.00 | $575,701.25 |
-| 2024-12-06 15:30 | NFP | BUY | +$137,712.50 | $713,413.75 |
-| 2024-12-11 15:30 | CPI | SELL | -$68,337.50 | $645,076.25 |
-| 2024-12-17 15:30 | Retail Sales | BUY | +$19,672.50 | $664,748.75 |
-| 2025-01-10 15:30 | NFP | BUY | +$41,250.00 | $705,998.75 |
-| 2025-01-15 15:30 | CPI | SELL | +$58,162.50 | $764,161.25 |
-| 2025-01-16 15:30 | Retail Sales | BUY | +$57,380.00 | $821,541.25 |
-| 2025-02-07 15:30 | NFP | BUY | -$184,500.00 | $637,041.25 |
-| 2025-02-12 15:30 | CPI | SELL | +$311,785.00 | $948,826.25 |
-| 2025-02-14 17:34 | Retail Sales | BUY | +$94,500.00 | $1,043,326.25 |
-| 2025-03-07 15:30 | NFP | SELL | +$62,920.00 | $1,106,246.25 |
-| 2025-03-12 15:30 | CPI | BUY | +$180,667.50 | $1,286,913.75 |
-| 2025-03-17 15:48 | Retail Sales | SELL | +$136,852.50 | $1,423,766.25 |
-| **2025-04-04 14:45** | **NFP** | **SELL** | **+$760,410.00** | **$2,184,176.25** |
+| NFP | 16 | 13 | 3 | 81.3% |
+| CPI | 15 | 10 | 5 | 66.7% |
+| Retail Sales | 15 | 11 | 4 | 73.3% |
+| **Overall** | **46** | **34** | **12** | **73.9%** |
 
-> Interactive cTrader HTML report: [`reports/cTrader_Backtest_Report.html`](reports/cTrader_Backtest_Report.html)
+### Compounding Milestones
+
+Because the risk is strictly capped to the allocated block ($450 total exposure), the cash reserve absorbs whipsaws, while the open-ended trailing stop rides winning spikes to easily cover the losses and scale into new multiplier brackets.
+
+| Date | Event | Multiplier | Bias Lots | Hedge Lots | Running Pot |
+|---|---|---|---|---|---|
+| 2024-01-05 | NFP | 1x | 0.75 | 0.38 | **$1,588.75** |
+| 2024-04-10 | CPI | 2x | 1.50 | 0.75 | **$4,238.48** |
+| 2024-05-15 | Retail Sales | 3x | 2.25 | 1.12 | **$10,861.73** |
+| 2024-06-18 | Retail Sales | 6x | 4.50 | 2.25 | **$16,283.48** |
+| 2024-07-16 | Retail Sales | 10x | 7.50 | 3.75 | **$34,368.23** |
+| 2024-08-14 | CPI | 17x | 12.75 | 6.38 | **$56,837.48** |
+| 2024-10-10 | CPI | 26x | 19.50 | 9.75 | **$91,522.76** |
+| 2024-11-13 | CPI | 30x | 22.50 | 11.25 | **$104,460.09** |
+| 2025-01-10 | NFP | 42x | 31.50 | 15.75 | **$128,665.14** |
+| 2025-02-14 | Retail Sales | 50x | 37.50 | 18.75 | **$188,210.38** |
+| 2025-03-07 | NFP | 63x | 47.25 | 23.62 | **$205,662.56** |
+| 2025-04-04 | NFP | 82x | 61.50 | 30.75 | **$227,093.06** |
+
+> Full simulation code: [`backtest/forensic_dual_sim.py`](backtest/forensic_dual_sim.py)
 
 ## Architecture
 
@@ -133,7 +104,8 @@ news-trader-ai/
 ├── src/
 │   └── NewsTraderEA.cs          # C# cBot — full autonomous execution engine
 ├── backtest/
-│   └── trinity_timeline.py      # Generates the Holy Trinity equity curve
+│   ├── trinity_timeline.py      # Base $5k Holy Trinity equity curve
+│   └── forensic_dual_sim.py     # Advanced $1k dual-terminal compound simulation
 ├── reports/
 │   ├── trade_history.csv        # Full chronological trade log
 │   ├── event_statistics.csv     # Per-event win rates and P&L
