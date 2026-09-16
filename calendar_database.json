@@ -1,0 +1,46 @@
+[
+  {
+    "id": "20260916_1800_federal_funds_rate",
+    "timestamp_utc": "2026-09-16T18:00:00Z",
+    "currency": "USD",
+    "event": "Federal Funds Rate",
+    "impact": "High",
+    "actual": null,
+    "forecast": 4.0,
+    "previous": 3.75,
+    "surprise": null
+  },
+  {
+    "id": "20260916_1800_fomc_economic_projections",
+    "timestamp_utc": "2026-09-16T18:00:00Z",
+    "currency": "USD",
+    "event": "FOMC Economic Projections",
+    "impact": "High",
+    "actual": null,
+    "forecast": null,
+    "previous": null,
+    "surprise": null
+  },
+  {
+    "id": "20260916_1800_fomc_statement",
+    "timestamp_utc": "2026-09-16T18:00:00Z",
+    "currency": "USD",
+    "event": "FOMC Statement",
+    "impact": "High",
+    "actual": null,
+    "forecast": null,
+    "previous": null,
+    "surprise": null
+  },
+  {
+    "id": "20260916_1830_fomc_press_conference",
+    "timestamp_utc": "2026-09-16T18:30:00Z",
+    "currency": "USD",
+    "event": "FOMC Press Conference",
+    "impact": "High",
+    "actual": null,
+    "forecast": null,
+    "previous": null,
+    "surprise": null
+  }
+]
