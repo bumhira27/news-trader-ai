@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Net;
 using System.Xml;
 using System.Collections.Generic;
 using cAlgo.API;
@@ -13,10 +12,10 @@ namespace cAlgo.Robots
     internal class FxEvent
     {
         public DateTime EventTime { get; set; }
-        public string Title     { get; set; }
-        public string Currency  { get; set; }
-        public double? Actual   { get; set; }
-        public double? Forecast { get; set; }
+        public string   Title     { get; set; }
+        public string   Currency  { get; set; }
+        public double?  Actual    { get; set; }
+        public double?  Forecast  { get; set; }
     }
 
     [Robot(TimeZone = TimeZones.SouthAfricaStandardTime, AccessRights = AccessRights.FullAccess)]
@@ -27,30 +26,27 @@ namespace cAlgo.Robots
 
         #region Parameters
 
-        // ── Setup ────────────────────────────────────────────────────────────────────
-        [Parameter("Account Role",        Group = "News",    DefaultValue = AccountRole.BiasAccount)]
+        [Parameter("Account Role",         Group = "News",     DefaultValue = AccountRole.BiasAccount)]
         public AccountRole Role { get; set; }
 
-        [Parameter("News Hour",           Group = "News",    DefaultValue = 15, MinValue = 0, MaxValue = 23)]
+        [Parameter("News Hour",            Group = "News",     DefaultValue = 15, MinValue = 0, MaxValue = 23)]
         public int NewsHour { get; set; }
 
-        [Parameter("News Minute",         Group = "News",    DefaultValue = 30, MinValue = 0, MaxValue = 59)]
+        [Parameter("News Minute",          Group = "News",     DefaultValue = 30, MinValue = 0, MaxValue = 59)]
         public int NewsMinute { get; set; }
 
-        [Parameter("Seconds Before",      Group = "News",    DefaultValue = 3,  MinValue = 1)]
+        [Parameter("Seconds Before",       Group = "News",     DefaultValue = 3,  MinValue = 1)]
         public int SecondsBefore { get; set; }
 
-        // ── Risk Management ──────────────────────────────────────────────────────────
-        [Parameter("Risk Capital ($)",    Group = "Risk Management", DefaultValue = 1000)]
-        public double RiskCapital { get; set; }
+        // Mirrors News Trader Pro exactly
+        [Parameter("Risk Percentage",      Group = "Risk Management", DefaultValue = 80, MinValue = 1, MaxValue = 100)]
+        public double RiskPercentage { get; set; }
 
-        // ── Trade Settings (Backtested M1 Scalp Defaults) ────────────────────────────
-        // No Take Profit — the trailing stop manages the full exit
-        [Parameter("Stop Loss (pips)",    Group = "Trading", DefaultValue = 300)]
+        [Parameter("Stop Loss (pips)",     Group = "Trading",  DefaultValue = 300)]
         public int StopLoss { get; set; }
 
-        // ── Trailing Stop ─────────────────────────────────────────────────────────────
-        [Parameter("Trailing Stop",       Group = "Trailing", DefaultValue = true)]
+        // No Take Profit — trailing stop is the sole exit mechanism
+        [Parameter("Trailing Stop",        Group = "Trailing", DefaultValue = true)]
         public bool IncludeTrailingStop { get; set; }
 
         [Parameter("Trail Trigger (pips)", Group = "Trailing", DefaultValue = 500)]
@@ -61,20 +57,23 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region Constants
+        #region Constants & Fields
 
         private const int    NewsTimeToleranceMinutes = 5;
         private const double MinMarginLevel           = 20.0;
+        private const double LotSizeLogThreshold      = 0.02;
         private readonly string _feedUrl = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
         private static readonly TimeZoneInfo _pretoriaZone =
             TimeZoneInfo.FindSystemTimeZoneById("South Africa Standard Time");
 
-        #endregion
+        // Lot size cache — mirrors News Trader Pro
+        private DateTime _lastLotSizeCalcTime = DateTime.MinValue;
+        private double   _cachedLotSize;
+        private double   _lastLoggedLotSize;
+        private double   _currentVolume;
 
-        #region Fields
-
-        private DateTime  _triggerTime;
-        private bool      _ordersPlaced;
+        private DateTime   _triggerTime;
+        private bool       _ordersPlaced;
         private TradeType? _aiBias            = null;
         private TradeType? _executionDirection = null;
 
@@ -92,35 +91,45 @@ namespace cAlgo.Robots
         protected override void OnStart()
         {
             Timer.Start(1);
-
-            // Match News Trader Pro: set trigger time on startup so countdown works immediately
+            _currentVolume = CalculateLotSize();
             var today = Server.Time;
-            _triggerTime = new DateTime(today.Year, today.Month, today.Day, NewsHour, NewsMinute, 0);
+            _triggerTime  = new DateTime(today.Year, today.Month, today.Day, NewsHour, NewsMinute, 0);
 
-            Print("[INIT] Fetching ForexFactory calendar and running AI analysis...");
+            Print("[INIT] Fetching ForexFactory & running AI analysis...");
             LoadAndAnalyse();
             DrawDashboard();
-
-            Print($"[INIT] Account Balance: {Account.Balance:C} | Equity: {Account.Equity:C} | Role: {Role}");
         }
 
         protected override void OnTick()
         {
-            // Margin guard — mirror News Trader Pro exactly
-            if (Account.MarginLevel < MinMarginLevel)
+            try
             {
-                foreach (var pos in Positions.FindAll(Label, SymbolName))
+                // Always trail first — mirrors News Trader Pro
+                if (IncludeTrailingStop)
+                    UpdateTrailingStops();
+
+                bool hasPositions = Positions.FindAll(Label, SymbolName).Any();
+
+                if (hasPositions)
                 {
-                    Print($"[Safety] Margin {Account.MarginLevel:F1}% < {MinMarginLevel}% — closing position {pos.Id}");
-                    ClosePosition(pos);
+                    HideChartDisplays();
+                    return;
+                }
+
+                // Margin safety check — mirrors News Trader Pro
+                if (Account.MarginLevel < MinMarginLevel)
+                {
+                    foreach (var pos in Positions.FindAll(Label, SymbolName))
+                    {
+                        Print($"[Safety] Margin < {MinMarginLevel}% — closing position {pos.Id}");
+                        ClosePosition(pos);
+                    }
                 }
             }
-
-            if (IncludeTrailingStop)
-                UpdateTrailingStops();
-
-            if (Positions.FindAll(Label, SymbolName).Any())
-                HideChartDisplays();
+            catch (Exception ex)
+            {
+                Print("[OnTick] " + ex);
+            }
         }
 
         protected override void OnTimer()
@@ -134,11 +143,9 @@ namespace cAlgo.Robots
                 }
 
                 DateTime now = Server.Time;
+                _triggerTime   = new DateTime(now.Year, now.Month, now.Day, NewsHour, NewsMinute, 0);
+                _currentVolume = CalculateLotSize();
 
-                // Rebuild trigger time daily (same as News Trader Pro)
-                _triggerTime = new DateTime(now.Year, now.Month, now.Day, NewsHour, NewsMinute, 0);
-
-                // Reset ordersPlaced flag after event window passes (5 min tolerance)
                 if (now > _triggerTime.AddMinutes(NewsTimeToleranceMinutes))
                     _ordersPlaced = false;
 
@@ -149,6 +156,39 @@ namespace cAlgo.Robots
             {
                 Print("[OnTimer] " + ex);
             }
+        }
+
+        #endregion
+
+        #region Lot Size — mirrors News Trader Pro exactly
+
+        private double CalculateLotSize()
+        {
+            if (Account.Balance <= 0)
+                return Symbol.VolumeInUnitsMin;
+
+            if (_cachedLotSize > 0 && (Server.Time - _lastLotSizeCalcTime).TotalSeconds < 2)
+                return _cachedLotSize;
+
+            _lastLotSizeCalcTime = Server.Time;
+
+            double riskAmount      = Account.Balance * (RiskPercentage / 100.0);
+            double marginPer001Lot = Symbol.GetEstimatedMargin(TradeType.Buy, Symbol.QuantityToVolumeInUnits(0.01));
+            if (marginPer001Lot <= 0) return Symbol.VolumeInUnitsMin;
+
+            double lots   = (riskAmount / marginPer001Lot) * 0.01;
+            double volume = Symbol.NormalizeVolumeInUnits(Symbol.QuantityToVolumeInUnits(lots), RoundingMode.ToNearest);
+
+            _cachedLotSize = volume;
+
+            if (_lastLoggedLotSize == 0.0 || Math.Abs(volume - _lastLoggedLotSize) / _lastLoggedLotSize > LotSizeLogThreshold)
+            {
+                _lastLoggedLotSize = volume;
+                double lotQty = Symbol.VolumeInUnitsToQuantity(volume);
+                Print($"[LotSize] Balance: {Account.Balance:F2} | Risk: {RiskPercentage}% | Lots: {lotQty:F2}");
+            }
+
+            return volume;
         }
 
         #endregion
@@ -169,23 +209,21 @@ namespace cAlgo.Robots
                 string xml = response.Body;
                 if (!xml.TrimStart().StartsWith("<") || xml.Contains("<html"))
                 {
-                    Print("[FF] Rate limited — will retry on next timer cycle");
+                    Print("[FF] Rate limited — will retry");
                     return;
                 }
 
                 var doc = new XmlDocument();
                 doc.LoadXml(xml);
-
                 _weeklyEvents.Clear();
 
                 foreach (XmlNode node in doc.GetElementsByTagName("event"))
                 {
+                    // Load ALL currencies — we need precursors from any country
+                    string title    = node["title"]?.InnerText.Trim()             ?? "";
                     string currency = node["country"]?.InnerText.Trim().ToUpper() ?? "";
-                    if (currency != "USD") continue;
-
-                    string title   = node["title"]?.InnerText.Trim() ?? "";
-                    string dateStr = node["date"]?.InnerText.Trim()  ?? "";
-                    string timeStr = node["time"]?.InnerText.Trim()  ?? "";
+                    string dateStr  = node["date"]?.InnerText.Trim()              ?? "";
+                    string timeStr  = node["time"]?.InnerText.Trim()              ?? "";
 
                     if (!DateTime.TryParse($"{dateStr} {timeStr}", out DateTime utcDt)) continue;
                     DateTime localDt = TimeZoneInfo.ConvertTimeFromUtc(
@@ -202,9 +240,9 @@ namespace cAlgo.Robots
                 }
 
                 _weeklyEvents = _weeklyEvents.OrderBy(e => e.EventTime).ToList();
-                Print($"[FF] Loaded {_weeklyEvents.Count} USD events this week.");
+                Print($"[FF] Loaded {_weeklyEvents.Count} total events this week.");
 
-                // Match user-configured time to an event
+                // Lock onto whatever event the user has pointed us at — no filtering
                 _targetEvent = _weeklyEvents.FirstOrDefault(e =>
                     e.EventTime > Server.Time &&
                     e.EventTime.Hour   == NewsHour &&
@@ -212,7 +250,7 @@ namespace cAlgo.Robots
 
                 if (_targetEvent == null)
                 {
-                    Print($"[FF] No USD event found at {NewsHour:D2}:{NewsMinute:D2}. Check ForexFactory.");
+                    Print($"[FF] No event found at {NewsHour:D2}:{NewsMinute:D2}. Check ForexFactory and re-enter the time.");
                     return;
                 }
 
@@ -229,62 +267,94 @@ namespace cAlgo.Robots
         {
             if (_targetEvent == null) return;
 
-            double score     = 0;
-            string title     = _targetEvent.Title.ToLower();
+            double score = 0;
+            string title = _targetEvent.Title.ToLower();
 
-            // ─── NFP ────────────────────────────────────────────────────────────────
-            if (title.Contains("farm") || title.Contains("nfp"))
+            // ── NFP ──────────────────────────────────────────────────────────
+            if (title.Contains("non-farm") || title.Contains("nfp"))
             {
-                var adp = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("ADP Non-Farm") && e.Actual.HasValue);
-                if (adp != null)
-                {
-                    double surprise = adp.Actual.Value - (adp.Forecast ?? adp.Actual.Value);
-                    // Strong jobs = hawkish Fed = stronger USD = bearish gold
-                    score -= Math.Sign(surprise) * 1.5;
-                    Print($"[AI] NFP | ADP surprise: {surprise:+0.0;-0.0} → score {score:+0.0;-0.0}");
-                }
-                else Print("[AI] NFP | ADP precursor not yet published this week.");
+                var adp = FindPrecursor("ADP Non-Farm");
+                if (adp != null) score += Surprise(adp) * -1.5; // Strong jobs = bearish gold
+                Print($"[AI] NFP | ADP score contribution: {score:+0.0;-0.0}");
             }
-            // ─── CPI ────────────────────────────────────────────────────────────────
-            else if (title.Contains("cpi"))
+            // ── CPI ──────────────────────────────────────────────────────────
+            else if (title.Contains("cpi") || title.Contains("consumer price"))
             {
-                var ism = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("ISM Services") && e.Actual.HasValue);
-                if (ism != null)
-                {
-                    double surprise = ism.Actual.Value - (ism.Forecast ?? ism.Actual.Value);
-                    score -= Math.Sign(surprise) * 1.0;
-                    Print($"[AI] CPI | ISM Services surprise: {surprise:+0.0;-0.0} → score {score:+0.0;-0.0}");
-                }
-                else Print("[AI] CPI | ISM Services precursor not yet published this week.");
+                var ism = FindPrecursor("ISM Services");
+                if (ism != null) score += Surprise(ism) * -1.0;
+                Print($"[AI] CPI | ISM score contribution: {score:+0.0;-0.0}");
             }
-            // ─── Retail Sales ───────────────────────────────────────────────────────
+            // ── PPI ──────────────────────────────────────────────────────────
+            else if (title.Contains("ppi") || title.Contains("producer price"))
+            {
+                var cpi = FindPrecursor("CPI"); // CPI leads PPI trend
+                if (cpi != null) score += Surprise(cpi) * -1.0;
+                Print($"[AI] PPI | CPI precursor score contribution: {score:+0.0;-0.0}");
+            }
+            // ── Retail Sales ─────────────────────────────────────────────────
             else if (title.Contains("retail"))
             {
-                var conf = _weeklyEvents.FirstOrDefault(e => e.Title.Contains("Consumer Confidence") && e.Actual.HasValue);
-                if (conf != null)
-                {
-                    double surprise = conf.Actual.Value - (conf.Forecast ?? conf.Actual.Value);
-                    score -= Math.Sign(surprise) * 1.5;
-                    Print($"[AI] Retail | Conf surprise: {surprise:+0.0;-0.0} → score {score:+0.0;-0.0}");
-                }
-                else Print("[AI] Retail | Consumer Confidence not yet published this week.");
+                var conf = FindPrecursor("Consumer Confidence");
+                if (conf != null) score += Surprise(conf) * -1.5;
+                Print($"[AI] Retail | Confidence score contribution: {score:+0.0;-0.0}");
+            }
+            // ── FOMC / Fed Rate ──────────────────────────────────────────────
+            else if (title.Contains("fomc") || title.Contains("federal funds") || title.Contains("interest rate"))
+            {
+                var cpi = FindPrecursor("CPI");
+                if (cpi != null) score += Surprise(cpi) * -1.0; // Hotter CPI = more hawkish = bearish gold
+                Print($"[AI] FOMC | CPI precursor score contribution: {score:+0.0;-0.0}");
+            }
+            // ── GDP ──────────────────────────────────────────────────────────
+            else if (title.Contains("gdp"))
+            {
+                var ism = FindPrecursor("ISM Manufacturing");
+                if (ism != null) score += Surprise(ism) * -1.0;
+                Print($"[AI] GDP | ISM Mfg score contribution: {score:+0.0;-0.0}");
+            }
+            // ── Generic fallback for anything else (PCE, Housing, etc.) ─────
+            else
+            {
+                Print($"[AI] '{_targetEvent.Title}' — no specific precursor model. Defaulting bias to BUY.");
+                score = 0;
             }
 
-            // Resolve AI directional bias
             if      (score > 0) _aiBias = TradeType.Buy;
             else if (score < 0) _aiBias = TradeType.Sell;
             else
             {
-                Print("[AI] No precursor divergence. Defaulting to BUY for BiasAccount.");
                 _aiBias = TradeType.Buy;
+                Print("[AI] Neutral score or no precursor data. Defaulting to BUY.");
             }
 
-            // Hedge account inverts the bias
             _executionDirection = Role == AccountRole.HedgeAccount
                 ? (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy)
                 : _aiBias;
 
-            Print($"[AI] AI Bias: {_aiBias} | Account: {Role} | Will Execute: {_executionDirection}");
+            Print($"[AI] Final Bias: {_aiBias} | Role: {Role} | Executing: {_executionDirection}");
+        }
+
+        // Find the most recent published precursor event by keyword
+        private FxEvent FindPrecursor(string keyword)
+        {
+            var match = _weeklyEvents
+                .Where(e => e.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                         && e.Actual.HasValue
+                         && e.EventTime < _targetEvent.EventTime)
+                .OrderByDescending(e => e.EventTime)
+                .FirstOrDefault();
+
+            if (match == null)
+                Print($"[AI] Precursor '{keyword}' not yet published this week.");
+
+            return match;
+        }
+
+        // Returns +1 if actual beat forecast (hawkish/strong), -1 if missed, 0 if flat
+        private static double Surprise(FxEvent e)
+        {
+            if (!e.Actual.HasValue || !e.Forecast.HasValue) return 0;
+            return Math.Sign(e.Actual.Value - e.Forecast.Value);
         }
 
         #endregion
@@ -298,25 +368,23 @@ namespace cAlgo.Robots
             if (_ordersPlaced) return;
             if (_executionDirection == null)
             {
-                Print("[Orders] No direction resolved yet — rerunning analysis.");
+                Print("[Orders] Direction not resolved — retrying analysis.");
                 LoadAndAnalyse();
                 if (_executionDirection == null) return;
             }
 
             _ordersPlaced = true;
 
-            // Lot sizing — mirror blueprint: 0.01 lots per $4 risk capital
-            double lots   = (RiskCapital / 4.0) * 0.01;
-            double volume = Symbol.NormalizeVolumeInUnits(
-                Symbol.QuantityToVolumeInUnits(lots), RoundingMode.ToNearest);
+            double volume = _currentVolume;
+            double lotQty = Symbol.VolumeInUnitsToQuantity(volume);
+            Print($"[Orders] {_executionDirection} | {lotQty:F2} lots | Balance: {Account.Balance:C}");
 
-            Print($"[Orders] Placing {_executionDirection} | {lots:F2} lots | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}");
-
+            // No Take Profit — trailing stop manages the exit
             ExecuteMarketOrderAsync(_executionDirection.Value, SymbolName, volume,
                 Label, StopLoss, null, Comment, result =>
                 {
                     if (result.IsSuccessful)
-                        Print($"[Order] Executed — Position {result.Position.Id} @ {result.Position.EntryPrice}");
+                        Print($"[Order] Executed — {result.Position.Id} @ {result.Position.EntryPrice}");
                     else
                         Print("[Order] Failed: " + result.Error);
                 });
@@ -324,14 +392,12 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region Trailing Stop  (mirrored from News Trader Pro)
+        #region Trailing Stop — mirrors News Trader Pro
 
         private void UpdateTrailingStops()
         {
-            UpdateTrailForType(TradeType.Buy,
-                () => Symbol.Bid - TrailingStopStep * Symbol.PipSize);
-            UpdateTrailForType(TradeType.Sell,
-                () => Symbol.Ask + TrailingStopStep * Symbol.PipSize);
+            UpdateTrailForType(TradeType.Buy,  () => Symbol.Bid - TrailingStopStep * Symbol.PipSize);
+            UpdateTrailForType(TradeType.Sell, () => Symbol.Ask + TrailingStopStep * Symbol.PipSize);
         }
 
         private void UpdateTrailForType(TradeType type, Func<double> calcSL)
@@ -359,7 +425,7 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region UI  (mirrored from News Trader Pro)
+        #region UI — mirrors News Trader Pro
 
         private void UpdateUI(DateTime now)
         {
@@ -370,20 +436,19 @@ namespace cAlgo.Robots
             countdown += "\n";
             DrawStaticText(CountdownLabel, countdown, VerticalAlignment.Top, HorizontalAlignment.Right, Color.Red);
 
-            double lots      = (RiskCapital / 4.0) * 0.01;
+            double lotQty    = Symbol.VolumeInUnitsToQuantity(_currentVolume);
             double margin001 = Symbol.GetEstimatedMargin(TradeType.Buy, Symbol.QuantityToVolumeInUnits(0.01));
-            double reqMargin = (lots / 0.01) * margin001;
+            double reqMargin = (lotQty / 0.01) * margin001;
             DrawStaticText(LotSizeLabel,
-                $"Lot Size: {lots:F2} | Margin: ${reqMargin:F0} | Balance: {Account.Balance:C} | Equity: {Account.Equity:C}",
-                VerticalAlignment.Top, HorizontalAlignment.Center, Color.DeepSkyBlue);
+                $"Calculated Lot Size: {lotQty:F2} lots | Required Margin: ${reqMargin:F2}",
+                VerticalAlignment.Top, HorizontalAlignment.Center, Color.Blue);
 
             DrawDashboard();
         }
 
         private void DrawDashboard()
         {
-            if (_dashboardPanel != null)
-                Chart.RemoveControl(_dashboardPanel);
+            if (_dashboardPanel != null) Chart.RemoveControl(_dashboardPanel);
 
             string eventName = _targetEvent != null ? _targetEvent.Title : $"No event at {NewsHour:D2}:{NewsMinute:D2}";
             string biasText  = _aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() + (_aiBias == TradeType.Buy ? " ▲" : " ▼") : "Analysing...";
@@ -416,19 +481,21 @@ namespace cAlgo.Robots
             });
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("Account Role:", Role.ToString(),  roleColor));
-            panel.AddChild(Row("Event:",        eventName,        Color.White));
-            panel.AddChild(Row("AI Bias:",      biasText,         biasColor));
-            panel.AddChild(Row("Executing:",    execText,         execColor));
+            panel.AddChild(Row("Role:",    Role.ToString(), roleColor));
+            panel.AddChild(Row("Event:",   eventName,       Color.White));
+            panel.AddChild(Row("AI Bias:", biasText,        biasColor));
+            panel.AddChild(Row("Execute:", execText,        execColor));
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("SL:",     $"{StopLoss} pips  (trailing manages exit)", Color.White));
-            panel.AddChild(Row("Trigger:", $"{TrailingStopTrigger} pips",              Color.White));
-            panel.AddChild(Row("Trail:",   $"{TrailingStopStep} pips",                 Color.White));
+            panel.AddChild(Row("Risk:",    $"{RiskPercentage}%",       Color.White));
+            panel.AddChild(Row("SL:",      $"{StopLoss} pips",         Color.White));
+            panel.AddChild(Row("Trigger:", $"{TrailingStopTrigger} pips", Color.White));
+            panel.AddChild(Row("Trail:",   $"{TrailingStopStep} pips", Color.White));
 
             panel.AddChild(Divider());
-            panel.AddChild(Row("Balance:", $"{Account.Balance:C}",  Color.White));
-            panel.AddChild(Row("Equity:",  $"{Account.Equity:C}",   Account.Equity >= Account.Balance ? Color.LimeGreen : Color.OrangeRed));
+            panel.AddChild(Row("Balance:", $"{Account.Balance:C}", Color.White));
+            panel.AddChild(Row("Equity:",  $"{Account.Equity:C}",
+                Account.Equity >= Account.Balance ? Color.LimeGreen : Color.OrangeRed));
 
             _dashboardPanel.Child = panel;
             Chart.AddControl(_dashboardPanel);
@@ -444,7 +511,7 @@ namespace cAlgo.Robots
         private static StackPanel Row(string label, string value, Color valueColor)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
-            row.AddChild(new TextBlock { Text = label, Width = 95, ForegroundColor = Color.LightGray });
+            row.AddChild(new TextBlock { Text = label, Width = 90, ForegroundColor = Color.LightGray });
             row.AddChild(new TextBlock { Text = value, ForegroundColor = valueColor, FontWeight = FontWeight.Bold });
             return row;
         }
