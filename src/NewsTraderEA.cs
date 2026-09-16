@@ -149,9 +149,9 @@ namespace cAlgo.Robots
             // Autonomous Mode: Read AI Bias File
             try
             {
-                if (File.Exists(BiasFilePath))
+                if (System.IO.File.Exists(BiasFilePath))
                 {
-                    string content = File.ReadAllText(BiasFilePath).Trim().ToUpper();
+                    string content = System.IO.File.ReadAllText(BiasFilePath).Trim().ToUpper();
                     TradeType aiBias = content.Contains("BUY") ? TradeType.Buy : TradeType.Sell;
                     
                     if (Role == AccountRole.HedgeAccount)
