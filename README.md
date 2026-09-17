@@ -1,134 +1,108 @@
 # News Trader AI
 
-News Trader AI is the interpretation layer for an economic-news trading system. The repository now keeps the data layer deliberately small: Forex Factory supplies calendar facts, the Economic Data Server stores and serves them, and the downstream trading logic interprets those facts.
+## Architectural Overview
 
-## Current architecture
+News Trader AI is an algorithmic trading execution pipeline engineered to trade high-impact macroeconomic events via the cTrader platform. The primary problem solved is the latency and analytical constraint of processing unstructured macroeconomic calendar data at the moment of release. 
 
-```text
-Forex Factory
-   │
-   ├─ current week export
-   └─ historical month calendar
-   │
-   ▼
-Economic Data Server
-   ├─ ingestion
-   ├─ normalization
-   ├─ validation
-   ├─ PostgreSQL
-   └─ FastAPI
-   │
-   ▼
-News Trader AI Context Engine
-   ├─ historical release lookup
-   ├─ surprise calculations
-   └─ event context
-   │
-   ▼
-cTrader execution bot
+By physically decoupling the data ingestion, context evaluation, and trade execution into isolated layers, this architecture ensures that the execution bot operates purely as a high-speed state machine. It removes expensive XML parsing and heuristic string-matching from the C# runtime, shifting all historical context computation to a dedicated Python backend.
+
+**Value Proposition:** Provides quantitative developers with a deterministic, testable data foundation (Economic Data Server) and an auditable decision engine (Context API), preventing the execution layer from failing due to external API rate limits, missing precursors, or complex timezone shifts.
+
+## Core Features & Capabilities
+
+- **Deterministic Time Normalization:** Utilizes IANA timezone mapping (`tzdata`) rather than fixed UTC offsets, guaranteeing correct alignment of historical events across Daylight Saving Time boundaries.
+- **Idempotent Data Ingestion:** The data pipeline handles batch processing of historical Forex Factory HTML calendars and current-week XML feeds with automatic duplicate resolution and constraint validation.
+- **Decoupled Precursor Heuristics:** Bias evaluation (e.g., correlating ADP Non-Farm performance prior to NFP releases) is executed entirely server-side, allowing the engine to scan months of historical data instantly.
+- **Fail-Safe Execution:** The C# client is designed to degrade gracefully. If the Context API times out or returns a 500, the cBot explicitly defaults to a `SKIP` bias, halting trade execution rather than guessing.
+
+## Component & Tech Stack
+
+### Data Layer
+- **PostgreSQL 16:** Production relational store for macro events.
+- **SQLite:** In-memory isolation for unit testing.
+- **SQLAlchemy 2.0.54:** ORM mapping and migration generation.
+- **Pydantic 2.13:** Strict schema validation for data ingestion.
+
+### API Layer
+- **FastAPI 0.141:** High-performance asynchronous REST API.
+- **Uvicorn 0.53:** ASGI web server.
+- **BeautifulSoup4 4.15:** Historical HTML parsing for macro calendars.
+
+### Client Infrastructure
+- **C# / .NET 6:** cAlgo API trading framework (cTrader).
+- **System.Text.Json:** Native JSON deserialization for Context API consumption.
+
+## Environment Configuration & Quick Start
+
+### 1. Repository Setup & Dependencies
+```bash
+git clone https://github.com/bumhira27/news-trader-ai.git
+cd news-trader-ai
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# Linux/macOS
+source .venv/bin/activate
+
+pip install -r economic_data_server/requirements.txt
+pip install tzdata
 ```
 
-The Economic Data Server stores economic-calendar facts. It does not store XAUUSD reaction data, MFE/MAE, tick-price research, or machine-learning datasets.
-
-## Repository structure
-
-```text
-news-trader-ai/
-├── economic_data_server/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── db.py
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   ├── ingest.py
-│   │   ├── normalizer.py
-│   │   ├── validator.py
-│   │   └── providers/
-│   │       ├── base.py
-│   │       └── forexfactory.py
-│   ├── fixtures/
-│   │   └── forexfactory_2026_08.json
-│   ├── tests/
-│   │   ├── test_api.py
-│   │   ├── test_forexfactory_provider.py
-│   │   ├── test_ingest.py
-│   │   ├── test_normalizer.py
-│   │   └── test_validator.py
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── requirements.txt
-│   └── README.md
-├── data/
-│   └── context_engine.py
-├── scoring/
-├── src/
-│   └── NewsTraderEA.cs
-├── pyproject.toml
-└── requirements.txt
+### 2. Database Initialization
+By default, the server will utilize an SQLite database for local development if PostgreSQL credentials are not provided.
+```bash
+# Optional: Set PostgreSQL credentials
+export DATABASE_URL="postgresql://user:password@localhost:5432/economic_data"
 ```
 
-## Economic Data Server
+### 3. Service Initialization
+The architecture requires two distinct API services.
 
-The server uses PostgreSQL explicitly. There is no silent PostgreSQL-to-SQLite fallback.
-
-Docker:
-
+**Start the Economic Data Server (Port 8000):**
 ```bash
 cd economic_data_server
-docker compose up -d --build
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-The API runs at `http://localhost:8000`.
-
-Historical month:
-
+**Start the Context Engine API (Port 8001):**
 ```bash
-cd economic_data_server
-python -m app.ingest --year 2026 --month 8
+# In a new terminal
+python run_context_api.py
 ```
 
-Historical range:
-
+### 4. Run Test Suite
 ```bash
-python -m app.ingest --start 2026-08-01 --end 2026-08-31
+# Ensure you are at the repository root
+python -m pytest -v
 ```
 
-Current week:
+## Core API / Integration Contracts
 
-```bash
-cd economic_data_server
-python -m app.ingest --latest
+### Context Engine Decision Payload
+The C# cBot executes an HTTP `GET` request to the Context API prior to the news event.
+
+**Request:**
+```http
+GET /api/v1/decision?target_time=2026-09-18T14:30:00Z&symbol=USD HTTP/1.1
+Host: 127.0.0.1:8001
 ```
 
-The historical importer retrieves the requested month from Forex Factory's historical calendar rather than treating a checked-in fixture as production data.
-
-## API
-
-`GET /health`
-
-`GET /api/v1/events`
-
-`GET /api/v1/events/{id}`
-
-`GET /api/v1/calendar/{year}/{month}`
-
-`GET /api/v1/news-events`
-
-`GET /api/v1/ingest/runs`
-
-`GET /api/v1/validation-report`
-
-## Context Engine
-
-`data/context_engine.py` is the analytical client. It queries the Economic Data API and calculates derived metrics such as economic surprise and forecast deviation. Those derived values stay outside the source database.
-
-## Testing
-
-```bash
-cd economic_data_server
-pytest tests/ -v
+**Response (200 OK):**
+```json
+{
+  "decision": "BUY",
+  "event": "Non-Farm Employment Change",
+  "event_timestamp": "2026-09-18T14:30:00+00:00",
+  "currency": "USD",
+  "facts_used": 1,
+  "context": {
+    "precursor_event": "ADP Non-Farm Employment Change",
+    "actual": 143000.0,
+    "forecast": 120000.0,
+    "previous": 105000.0
+  },
+  "reason": "Precursor 'ADP Non-Farm Employment Change' surprise=23000.0 * weight=-1.5 -> score=-34500.0",
+  "valid_until": "2026-09-18T14:35:00+00:00"
+}
 ```
-
-## Data-source boundary
-
-Forex Factory is the upstream source used by this project. Historical HTML is used for month-level retrieval because the FairEconomy export is a current-week feed. The application does not attempt to bypass access controls or scrape price/reaction data.

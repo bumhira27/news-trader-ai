@@ -1,83 +1,52 @@
 # Contributing to News Trader AI
 
-This document establishes the baseline engineering protocols, onboarding constraints, and repository branching strategies required for contributing to the News Trader AI codebase.
+We treat documentation, test coverage, and deterministic builds as core engineering features. Contributions must strictly adhere to the following standards.
 
-## Local Environment Onboarding
+## Local Developer Environment
 
-Contributors must configure their environments to match the absolute baseline specifications.
+To contribute, your local environment must mirror the CI pipeline.
 
-### Dependencies
-1. **Python**: Version 3.12.0 or higher.
-2. **PostgreSQL**: Version 15.0 or higher (or Docker Desktop for containerized deployment).
-3. **.NET SDK**: Version 6.0 (for compiling the C# execution bot).
+1. **Python Runtime:** Strict targeting of Python 3.12.x.
+2. **Virtual Environment:** Code must execute inside an isolated virtual environment (`.venv`).
+3. **Database:** Testing requires a functioning SQLite implementation. Production patches must be validated against PostgreSQL 16.
+4. **Timezones:** The OS must have valid IANA timezone databases accessible, or `tzdata` must be explicitly installed via `pip`.
 
-### Setup Execution
-Execute the environment initialization sequence strictly:
+## Linting & Formatting Baseline
 
-```bash
-git clone https://github.com/bumhira27/news-trader-ai.git
-cd news-trader-ai
-python -m venv venv
-source venv/bin/activate
-pip install -r economic_data_server/requirements.txt
-pip install -r requirements.txt
-```
+Code cleanliness is mechanically enforced. We do not argue about style.
 
-### Testing Baseline
-All pull requests must pass the comprehensive pytest suite locally prior to submission.
-```bash
-python -m pytest -v
-```
+- **Formatter:** `black` (Line length: 120)
+- **Linter:** `ruff` (Catching unused imports, undefined variables, and basic security flaws)
+- **Type Checking:** `mypy` (Strict mode enabled. All functions must have explicit type hints for arguments and return values).
 
-## Linting and Formatting Policies
-
-Code submissions must adhere to the following static analysis and formatting baselines. 
-
-- **Python Formatting**: `black` (Line length: 120).
-- **Type Checking**: `mypy` (Strict mode).
-- **C# Formatting**: Standard `dotnet format` complying with Microsoft C# conventions.
-
-Files failing lint or type checks in the CI pipeline will trigger automatic PR rejection.
+*C# Code:* Must conform to standard `.editorconfig` rules bundled with Visual Studio/cTrader (.NET 6 baseline).
 
 ## Branching Strategy
 
-This repository follows a strict Trunk-Based Development model.
+This repository utilizes **Trunk-Based Development**.
+- The `main` branch is the absolute source of truth and must always be in a deployable state.
+- Short-lived feature branches (`feat/`, `fix/`, `chore/`) are branched from `main`.
+- We do not use long-running `develop` or `release` branches.
 
-- **`main`**: The canonical, deployable artifact state. Commits direct to main are blocked.
-- **Feature Branches**: Cut from `main` using the format `feature/<issue-id>-<short-desc>` or `fix/<issue-id>-<short-desc>`.
-- **Merge Protocol**: Rebase feature branches against `main` prior to PR submission. Merge commits are disabled; squash and merge is enforced.
+## Pull Request Approval Policies
 
-## Pull Request Policy
-
-1. **Test Coverage**: PRs must maintain or increase total codebase line-coverage metrics. Regression tests must be included for bug fixes.
-2. **Architectural Review**: Modifications to the `economic_data_server` schema or API contracts require explicitly updated Markdown documentation in the PR.
-3. **Approval**: One approving review from a core maintainer is required for integration.
+Before a Pull Request is merged into `main`, it must satisfy the following constraints:
+1. **Zero Failing Tests:** `python -m pytest -v` must execute with 100% pass rate.
+2. **Type Safety:** `mypy .` must report zero errors.
+3. **No Unaudited Artifacts:** Commits must not contain compiled binaries, SQLite databases (`.db`), or temporary parquet/csv outputs. 
+4. **Clean Git History:** Commits must follow the Semantic Commit Guidelines.
 
 ## Semantic Commit Guidelines
 
-Commit messages must conform to the Conventional Commits specification. This ensures automated CHANGELOG generation and semantic versioning stability.
+We strictly adhere to [Conventional Commits](https://www.conventionalcommits.org/).
 
-### Format
-```
-<type>(<scope>): <subject>
+**Allowed Prefixes:**
+- `feat:` A new feature (e.g., adding a new API endpoint)
+- `fix:` A bug fix (e.g., correcting timezone parsing)
+- `docs:` Documentation only changes
+- `chore:` Maintenance tasks, dependency updates, or artifact removal
+- `refactor:` Code changes that neither fix a bug nor add a feature
+- `test:` Adding or modifying tests
+- `ci:` Changes to CI configuration files and scripts
 
-<body>
-```
-
-### Allowed Types
-- **`feat:`** A new feature or architectural component (e.g., new API endpoint).
-- **`fix:`** A bug fix or logical correction.
-- **`docs:`** Modifications restricted entirely to markdown files or inline documentation.
-- **`style:`** Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons).
-- **`refactor:`** A code change that neither fixes a bug nor adds a feature.
-- **`perf:`** A code change that improves operational performance or runtime efficiency.
-- **`test:`** Addition of missing tests or correcting existing test suites.
-- **`ci:`** Changes to CI configuration files and automation scripts.
-- **`chore:`** Maintenance tasks, dependency bumps, or build process updates.
-
-### Example
-```
-feat(api): add high-impact news event filter endpoint
-
-Implemented the /api/v1/news-events route allowing clients to filter calendar items natively by USD currency and High impact classification.
-```
+*Example:* `fix: resolve IANA timezone parsing failure during DST shifts`

@@ -171,6 +171,60 @@ class ContextEngine:
 
         return "\n".join(context_lines)
 
+    def evaluate_bias(self, target_event: Dict[str, Any]) -> tuple[str, str, Dict[str, Any], int]:
+        """
+        Evaluates trade bias based on historical precursors.
+        Returns (decision, reason, context_dict, facts_used)
+        decision: "BUY", "SELL", or "SKIP"
+        """
+        title = target_event.get("event", "").lower()
+        target_dt = target_event.get("_dt")
+        if not target_dt and isinstance(target_event.get("timestamp_utc"), str):
+            target_dt = datetime.fromisoformat(target_event["timestamp_utc"].replace("Z", "+00:00"))
+        
+        if not target_dt:
+            return "SKIP", "No valid timestamp on target event", {}, 0
+
+        precursor_keyword = None
+        weight = 0.0
+
+        if "non-farm" in title or "nfp" in title:
+            precursor_keyword, weight = "ADP Non-Farm", -1.5
+        elif "cpi" in title or "consumer price" in title:
+            precursor_keyword, weight = "ISM Services", -1.0
+        elif "ppi" in title or "producer price" in title:
+            precursor_keyword, weight = "CPI", -1.0
+        elif "retail" in title:
+            precursor_keyword, weight = "Consumer Confidence", -1.5
+        elif "fomc" in title or "federal funds" in title or "interest rate" in title:
+            precursor_keyword, weight = "CPI", -1.0
+        elif "gdp" in title:
+            precursor_keyword, weight = "ISM Manufacturing", -1.0
+        else:
+            return "SKIP", f"No specific precursor model for '{title}'", {}, 0
+
+        precursor = self.get_latest_release(precursor_keyword, target_dt)
+        if not precursor:
+            return "SKIP", f"Precursor '{precursor_keyword}' not found before event", {}, 0
+
+        surp = precursor.get("surprise")
+        if surp is None:
+            return "SKIP", f"Precursor '{precursor_keyword}' has no actual/forecast surprise", {}, 0
+
+        score = (1 if surp > 0 else (-1 if surp < 0 else 0)) * weight
+        
+        context = {
+            "precursor_event": precursor.get("event"),
+            "actual": parse_numeric_val(precursor.get("actual")),
+            "forecast": parse_numeric_val(precursor.get("forecast")),
+            "previous": parse_numeric_val(precursor.get("previous"))
+        }
+        
+        decision = "BUY" if score > 0 else ("SELL" if score < 0 else "SKIP")
+        reason = f"Precursor '{precursor.get('event')}' surprise={surp} * weight={weight} -> score={score}"
+        
+        return decision, reason, context, 1
+
 if __name__ == "__main__":
     engine = ContextEngine()
     print("News Trader AI Context Engine Ready.")

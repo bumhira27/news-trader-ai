@@ -1,7 +1,8 @@
 using System;
 using System.Linq;
 using System.Text;
-using System.Xml;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Globalization;
 using System.Collections.Generic;
 using cAlgo.API;
@@ -49,13 +50,16 @@ namespace cAlgo.Robots
         }
     }
 
-    internal class NewsEventInfo
+    internal class ContextDecision
     {
-        public DateTime EventTime { get; set; }
-        public string   Title     { get; set; }
-        public string   Currency  { get; set; }
-        public double?  Actual    { get; set; }
-        public double?  Forecast  { get; set; }
+        [JsonPropertyName("decision")]
+        public string Decision { get; set; }
+
+        [JsonPropertyName("event")]
+        public string Event { get; set; }
+
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; }
     }
 
     [Robot(TimeZone = TimeZones.SouthAfricaStandardTime, AccessRights = AccessRights.None)]
@@ -108,7 +112,7 @@ namespace cAlgo.Robots
         private const double MinMarginLevel            = 20.0;
         private const double LotSizeLogThreshold       = 0.02;
 
-        private readonly string _feedUrl = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
+        private readonly string _apiUrl = "http://127.0.0.1:8001/api/v1/decision";
 
         private static readonly TimeZoneInfo _pretoriaZone =
             TimeZoneInfo.FindSystemTimeZoneById("South Africa Standard Time");
@@ -133,8 +137,7 @@ namespace cAlgo.Robots
         // AI-specific fields
         private TradeType?         _aiBias            = null;
         private TradeType?         _executionDirection = null;
-        private List<NewsEventInfo> _allWeeklyEvents   = new List<NewsEventInfo>();
-        private NewsEventInfo       _targetEvent        = null;
+                private string _targetEventName = "Unknown";
 
         // Display labels
         private const string CountdownLabel = "countdown";
@@ -173,12 +176,12 @@ namespace cAlgo.Robots
                 if (IncludeTrailingStop)
                     UpdateTrailingStops();
 
-                // Margin safety check — MUST run before returning
+                // Margin safety check â€” MUST run before returning
                 if (Account.MarginLevel < MinMarginLevel)
                 {
                     foreach (var pos in Positions.FindAll(Label, SymbolName))
                     {
-                        Print($"[Safety] Margin < {MinMarginLevel}% — closing position {pos.Id}");
+                        Print($"[Safety] Margin < {MinMarginLevel}% â€” closing position {pos.Id}");
                         ClosePosition(pos);
                     }
                 }
@@ -274,7 +277,7 @@ namespace cAlgo.Robots
             ExecuteMarketOrderAsync(type, SymbolName, volume, Label, StopLoss, null, Comment, result =>
             {
                 if (result.IsSuccessful)
-                    Print($"[Order] Executed — Position {result.Position.Id} @ {result.Position.EntryPrice}");
+                    Print($"[Order] Executed â€” Position {result.Position.Id} @ {result.Position.EntryPrice}");
                 else
                     Print("[Order] Failed: " + result.Error);
             });
@@ -344,108 +347,7 @@ namespace cAlgo.Robots
 
         #endregion
 
-        #region AI Heuristics
-
-        private void RunAiHeuristics()
-        {
-            if (_targetEvent == null) return;
-
-            if (ManualBias != BiasOverride.Auto)
-            {
-                Print($"[AI] Using Manual Override: {ManualBias}");
-                if (ManualBias == BiasOverride.Skip)
-                {
-                    _aiBias = null;
-                    _executionDirection = null;
-                }
-                else
-                {
-                    _aiBias = ManualBias == BiasOverride.Buy ? TradeType.Buy : TradeType.Sell;
-                    _executionDirection = (Role == AccountRole.BiasAccount) ? _aiBias : (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy);
-                }
-                return;
-            }
-
-            double score = 0;
-            string title = _targetEvent.Title.ToLower();
-            bool hasPrecursor = false;
-
-            if (title.Contains("non-farm") || title.Contains("nfp"))
-            {
-                var adp = FindPrecursor("ADP Non-Farm");
-                if (adp != null) { score += Surprise(adp) * -1.5; hasPrecursor = true; Print($"[AI] NFP | ADP surprise → score {score:+0.0;-0.0}"); }
-                else Print("[AI] NFP | ADP not yet published this week.");
-            }
-            else if (title.Contains("cpi") || title.Contains("consumer price"))
-            {
-                var ism = FindPrecursor("ISM Services");
-                if (ism != null) { score += Surprise(ism) * -1.0; hasPrecursor = true; Print($"[AI] CPI | ISM Services surprise → score {score:+0.0;-0.0}"); }
-                else Print("[AI] CPI | ISM Services not yet published this week.");
-            }
-            else if (title.Contains("ppi") || title.Contains("producer price"))
-            {
-                var cpi = FindPrecursor("CPI");
-                if (cpi != null) { score += Surprise(cpi) * -1.0; hasPrecursor = true; Print($"[AI] PPI | CPI precursor → score {score:+0.0;-0.0}"); }
-                else Print("[AI] PPI | CPI not yet published this week.");
-            }
-            else if (title.Contains("retail"))
-            {
-                var conf = FindPrecursor("Consumer Confidence");
-                if (conf != null) { score += Surprise(conf) * -1.5; hasPrecursor = true; Print($"[AI] Retail | Confidence surprise → score {score:+0.0;-0.0}"); }
-                else Print("[AI] Retail | Consumer Confidence not yet published this week.");
-            }
-            else if (title.Contains("fomc") || title.Contains("federal funds") || title.Contains("interest rate"))
-            {
-                var cpi = FindPrecursor("CPI");
-                if (cpi != null) { score += Surprise(cpi) * -1.0; hasPrecursor = true; Print($"[AI] FOMC | CPI precursor → score {score:+0.0;-0.0}"); }
-                else Print("[AI] FOMC | CPI not yet published this week.");
-            }
-            else if (title.Contains("gdp"))
-            {
-                var ism = FindPrecursor("ISM Manufacturing");
-                if (ism != null) { score += Surprise(ism) * -1.0; hasPrecursor = true; Print($"[AI] GDP | ISM Mfg → score {score:+0.0;-0.0}"); }
-                else Print("[AI] GDP | ISM Manufacturing not yet published this week.");
-            }
-            else
-            {
-                Print($"[AI] '{_targetEvent.Title}' — no specific precursor model. Skipping trade.");
-            }
-
-            if (!hasPrecursor || score == 0)
-            {
-                Print("[AI] No precursor data or neutral score. Bias is SKIP (No Trade).");
-                _aiBias = null;
-                _executionDirection = null;
-                return;
-            }
-
-            if (score > 0) _aiBias = TradeType.Buy;
-            if (score < 0) _aiBias = TradeType.Sell;
-
-            _executionDirection = Role == AccountRole.HedgeAccount
-                ? (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy)
-                : _aiBias;
-
-            Print($"[AI] Bias: {_aiBias} | Role: {Role} | Executing: {_executionDirection}");
-        }
-
-        private NewsEventInfo FindPrecursor(string keyword)
-        {
-            return _allWeeklyEvents
-                .Where(e => e.Title.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0
-                         && e.Actual.HasValue
-                         && e.EventTime < _targetEvent.EventTime)
-                .OrderByDescending(e => e.EventTime)
-                .FirstOrDefault();
-        }
-
-        private static double Surprise(NewsEventInfo e)
-        {
-            if (!e.Actual.HasValue || !e.Forecast.HasValue) return 0;
-            return Math.Sign(e.Actual.Value - e.Forecast.Value);
-        }
-
-        #endregion
+        
 
         #region News Feed
 
@@ -453,94 +355,81 @@ namespace cAlgo.Robots
         {
             try
             {
-                HttpResponse response = Http.Get(_feedUrl);
-
-                if (!response.IsSuccessful)
-                {
-                    Print($"[News] Feed failed — HTTP {response.StatusCode}");
-                    return;
-                }
-
-                string xml = response.Body;
-
-                if (!xml.TrimStart().StartsWith("<") || xml.Contains("<html"))
-                {
-                    Print("[News] Rate limited — will retry next cycle");
-                    return;
-                }
-
-                var doc = new XmlDocument();
-                doc.LoadXml(xml);
-
                 DateTime today = Server.Time.Date;
                 _triggerTime = new DateTime(today.Year, today.Month, today.Day, NewsHour, NewsMinute, 0);
 
-                _allWeeklyEvents.Clear();
-                _targetEvent = null;
+                // Convert server trigger time to UTC ISO format
+                DateTime triggerUtc = TimeZoneInfo.ConvertTimeToUtc(_triggerTime, _pretoriaZone);
+                string targetTimeIso = triggerUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
-                foreach (XmlNode node in doc.GetElementsByTagName("event"))
+                string url = $"{_apiUrl}?target_time={targetTimeIso}&symbol={SymbolName}";
+                HttpResponse response = Http.Get(url);
+
+                if (!response.IsSuccessful)
                 {
-                    string title    = node["title"]?.InnerText.Trim()             ?? "";
-                    string currency = node["country"]?.InnerText.Trim().ToUpper() ?? "";
-                    string dateStr  = node["date"]?.InnerText.Trim()              ?? "";
-                    string timeStr  = node["time"]?.InnerText.Trim()              ?? "";
+                    Print($"[Context API] Request failed — HTTP {response.StatusCode}");
+                    SetSkipBias();
+                    return;
+                }
 
-                    if (!DateTime.TryParseExact($"{dateStr} {timeStr}",
-                            new[] { "MMM d, yyyy h:mmtt", "M/d/yyyy h:mmtt", "MM-dd-yyyy h:mmtt", "M-d-yyyy h:mmtt" },
-                            CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime eventDt)
-                        && !DateTime.TryParse($"{dateStr} {timeStr}", out eventDt))
+                var decision = JsonSerializer.Deserialize<ContextDecision>(response.Body);
+                if (decision == null)
+                {
+                    Print("[Context API] Failed to parse JSON response");
+                    SetSkipBias();
+                    return;
+                }
+
+                _targetEventName = decision.Event;
+                
+                if (ManualBias != BiasOverride.Auto)
+                {
+                    Print($"[AI] Using Manual Override: {ManualBias}");
+                    if (ManualBias == BiasOverride.Skip)
                     {
-                        continue;
+                        SetSkipBias();
                     }
-
-                    DateTime eventLocal = TimeZoneInfo.ConvertTimeFromUtc(
-                        DateTime.SpecifyKind(eventDt, DateTimeKind.Utc), _pretoriaZone);
-
-                    _allWeeklyEvents.Add(new NewsEventInfo
+                    else
                     {
-                        EventTime = eventLocal,
-                        Title     = title,
-                        Currency  = currency,
-                        Actual    = ParseValue(node["actual"]?.InnerText),
-                        Forecast  = ParseValue(node["forecast"]?.InnerText)
-                    });
+                        _aiBias = ManualBias == BiasOverride.Buy ? TradeType.Buy : TradeType.Sell;
+                        _executionDirection = (Role == AccountRole.BiasAccount) ? _aiBias : (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy);
+                    }
+                    return;
                 }
 
-                _allWeeklyEvents = _allWeeklyEvents.OrderBy(e => e.EventTime).ToList();
+                if (decision.Decision == "BUY") _aiBias = TradeType.Buy;
+                else if (decision.Decision == "SELL") _aiBias = TradeType.Sell;
+                else _aiBias = null;
 
-                _targetEvent = _allWeeklyEvents.FirstOrDefault(e =>
-                    e.EventTime.Date == today &&
-                    e.EventTime.Hour   == NewsHour &&
-                    e.EventTime.Minute == NewsMinute &&
-                    !string.IsNullOrEmpty(e.Currency) &&
-                    SymbolName.ToUpper().Contains(e.Currency));
+                _executionDirection = Role == AccountRole.HedgeAccount
+                    ? (_aiBias == TradeType.Buy ? TradeType.Sell : TradeType.Buy)
+                    : _aiBias;
 
-                if (_targetEvent == null)
-                    Print($"[News] No event found at {NewsHour:D2}:{NewsMinute:D2} for {SymbolName}. Check ForexFactory.");
-                else
-                {
-                    Print($"[News] Target: '{_targetEvent.Title}' @ {_targetEvent.EventTime:HH:mm}");
-                    RunAiHeuristics();
-                }
+                Print($"[Context API] Target: {decision.Event}");
+                Print($"[Context API] Reason: {decision.Reason}");
+                Print($"[Context API] Bias: {_aiBias} | Role: {Role} | Executing: {_executionDirection}");
             }
             catch (Exception ex)
             {
-                Print("[News] Error: " + ex.Message);
+                Print("[Context API] Error: " + ex.Message);
+                SetSkipBias();
             }
+        }
+
+        private void SetSkipBias()
+        {
+            _aiBias = null;
+            _executionDirection = null;
+            _targetEventName = "Unknown or Error";
         }
 
         private void DisplayNewsEvents()
         {
             var sb = new StringBuilder();
 
-            if (_targetEvent == null)
-                sb.AppendLine($"No event found at {NewsHour:D2}:{NewsMinute:D2} for {SymbolName}");
-            else
-            {
-                sb.AppendLine($"Target: {_targetEvent.Currency}: {_targetEvent.Title}");
-                sb.AppendLine($"AI Bias: {(_aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() : "SKIP (No Trade)")}");
-                sb.AppendLine($"Executing: {(_executionDirection.HasValue ? _executionDirection.Value.ToString().ToUpper() : "---")}");
-            }
+            sb.AppendLine($"Target: {_targetEventName}");
+            sb.AppendLine($"AI Bias: {(_aiBias.HasValue ? _aiBias.Value.ToString().ToUpper() : "SKIP (No Trade)")}");
+            sb.AppendLine($"Executing: {(_executionDirection.HasValue ? _executionDirection.Value.ToString().ToUpper() : "---")}");
 
             DrawStaticText(NewsLabel, sb.ToString(), VerticalAlignment.Top, HorizontalAlignment.Left, Color.White);
         }
@@ -582,8 +471,8 @@ namespace cAlgo.Robots
             if (_dashboardPanel != null)
                 Chart.RemoveControl(_dashboardPanel);
 
-            string biasText  = _aiBias.HasValue ? (_aiBias == TradeType.Buy ? "BUY  ▲" : "SELL  ▼") : "SKIP";
-            string execText  = _executionDirection.HasValue ? (_executionDirection == TradeType.Buy ? "BUY  ▲" : "SELL  ▼") : "---";
+            string biasText  = _aiBias.HasValue ? (_aiBias == TradeType.Buy ? "BUY  â–²" : "SELL  â–¼") : "SKIP";
+            string execText  = _executionDirection.HasValue ? (_executionDirection == TradeType.Buy ? "BUY  â–²" : "SELL  â–¼") : "---";
             Color  biasColor = _aiBias == TradeType.Buy ? Color.LimeGreen : (_aiBias == TradeType.Sell ? Color.Red : Color.Gray);
             Color  execColor = _executionDirection == TradeType.Buy ? Color.LimeGreen : Color.Gray;
             Color  roleColor = Role == AccountRole.BiasAccount ? Color.DodgerBlue : Color.Orange;
