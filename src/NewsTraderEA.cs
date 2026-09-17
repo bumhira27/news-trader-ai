@@ -48,7 +48,7 @@ namespace cAlgo.Robots
         [JsonPropertyName("reason")]
         public string Reason { get; set; }
     }
-    [Robot(TimeZone = TimeZones.SouthAfricaStandardTime, AccessRights = AccessRights.None)]
+    [Robot(TimeZone = TimeZones.SouthAfricaStandardTime, AccessRights = AccessRights.Internet)]
     public class NewsTraderEA : Robot
     {
         private const string Label   = "News Trader AI";
