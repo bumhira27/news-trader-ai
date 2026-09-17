@@ -1,152 +1,129 @@
 # Economic Data Server
 
-Dedicated economic-calendar context engine and API server for News Trader AI. Supplies normalized, validated historical and current macroeconomic calendar data without trading-reaction calculations or machine-learning dependencies.
+Dedicated economic-calendar data service for News Trader AI. It supplies factual calendar records only:
+
+- event
+- currency
+- impact
+- timestamp_utc
+- actual
+- forecast
+- previous
+- source/detail metadata
+
+It does not calculate XAUUSD reactions, MFE/MAE, trading outcomes, or machine-learning features.
 
 ## Architecture
 
-```
-Forex Factory (Export / HTML)
-        │
-        ▼
-Economic Data Ingestion (app.ingest)
-        │
-        ▼
-Normalization & Validation (app.normalizer, app.validator)
-        │
-        ▼
-PostgreSQL / SQLite (app.models)
-        │
-        ▼
-FastAPI Server (app.main)
-        │
-        ▼
-News Trader AI Context Engine
-```
-
-## Directory Structure
-
-```
-economic_data_server/
-├── app/
-│   ├── __init__.py
-│   ├── main.py            # FastAPI endpoints and route handlers
-│   ├── db.py              # Database session and connection pooling
-│   ├── models.py          # SQLAlchemy models (EconomicEvent, IngestionRun, EventRevision)
-│   ├── schemas.py         # Pydantic schemas for requests and responses
-│   ├── ingest.py          # Ingestion pipeline and CLI runner
-│   ├── normalizer.py      # Data cleaning, UTC conversion, and key generator
-│   ├── validator.py       # Data validation and duplicate boundary checking
-│   └── providers/
-│       ├── __init__.py
-│       ├── base.py        # Abstract BaseCalendarProvider interface
-│       └── forexfactory.py# Forex Factory export and file provider
-├── tests/
-│   ├── __init__.py
-│   ├── test_normalizer.py
-│   ├── test_validator.py
-│   ├── test_ingest.py
-│   └── test_api.py
-├── fixtures/
-│   └── forexfactory_2026_08.json
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
+```text
+Forex Factory
+   ├─ current week export (JSON/XML)
+   └─ historical month calendar (HTML)
+              │
+              ▼
+       Economic Ingestion
+              │
+              ▼
+      Normalize + Validate
+              │
+              ▼
+          PostgreSQL
+              │
+              ▼
+          FastAPI REST
+              │
+              ▼
+      News Trader AI Context Engine
 ```
 
-## Running with Docker Compose
+The production database is PostgreSQL. SQLite is used only inside tests when a test explicitly provides an SQLite engine. The server never silently switches database engines.
 
-To start PostgreSQL and the FastAPI application in containers:
+## Run with Docker Compose
 
 ```bash
 docker compose up -d --build
 ```
 
-The server will be reachable at `http://localhost:8000`.
+The API will be available at `http://localhost:8000`.
 
-## Running Locally
+## Local Setup
 
-1. Install dependencies:
+Set PostgreSQL explicitly:
 
 ```bash
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/economic_data"
 pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-2. Start the FastAPI server:
+On Windows PowerShell:
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/economic_data"
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The database connection defaults to `postgresql://postgres:postgres@localhost:5432/economic_data`. If PostgreSQL is not detected, it automatically uses `sqlite:///./economic_data.db` for local testing.
+## Ingestion
 
-## Ingestion Commands
-
-Import a specific historical month:
+Historical month. This retrieves the requested month directly from Forex Factory's historical calendar page rather than automatically substituting a local fixture:
 
 ```bash
 python -m app.ingest --year 2026 --month 8
 ```
 
-Import an explicit date window:
+Explicit historical range:
 
 ```bash
 python -m app.ingest --start 2026-08-01 --end 2026-08-31
 ```
 
-Import the latest releases from the upstream feed:
+Current release feed:
 
 ```bash
 python -m app.ingest --latest
 ```
 
-Import from a local fixture or export file:
+Explicit local file. This is intended for deterministic tests or controlled imports only:
 
 ```bash
 python -m app.ingest --file fixtures/forexfactory_2026_08.json
 ```
 
-All ingestion operations are idempotent. Repeated executions update modified fields without duplicating rows.
+All writes use a deterministic `source_event_key`, so repeated ingestion is idempotent and revised actual/forecast/previous values are tracked in `event_revisions`.
 
-## API Endpoints
+## API
 
 Base URL: `http://localhost:8000`
 
-### Health Check
-- `GET /health`
-  Returns service status and database connectivity.
+`GET /health`  
+Database/service health.
 
-### Economic Events
-- `GET /api/v1/events`
-  Filters: `start`, `end`, `currency`, `impact`, `event`, `event_type`, `limit`, `offset`.
-  Example:
-  `/api/v1/events?currency=USD&impact=High&start=2026-08-01`
+`GET /api/v1/events`  
+Filters: `start`, `end`, `currency`, `impact`, `event`, `event_type`, `limit`, `offset`.
 
-### Monthly Calendar
-- `GET /api/v1/calendar/{year}/{month}`
-  Example:
-  `/api/v1/calendar/2026/8`
+Example:
 
-### Single Event
-- `GET /api/v1/events/{id}`
-  Example:
-  `/api/v1/events/7`
+```text
+/api/v1/events?currency=USD&impact=High&start=2026-08-01&end=2026-08-31
+```
 
-### News-Relevant Context
-- `GET /api/v1/news-events?currency=USD&high_impact_only=true`
-  Returns high-relevance calendar events for upstream decision engines.
+`GET /api/v1/calendar/{year}/{month}`  
+Full monthly calendar view.
 
-### Validation Report
-- `GET /api/v1/validation-report?year=2026&month=8`
-  Returns data quality metrics: total records, unique keys, duplicates, and breakdowns by currency and impact.
+`GET /api/v1/events/{id}`  
+Single event lookup.
 
-### Ingestion Runs
-- `GET /api/v1/ingest/runs`
-  Returns audit logs of recent ingestion jobs with inserted/updated/rejected counts.
+`GET /api/v1/news-events?currency=USD&high_impact_only=true`  
+Factual filtered view for downstream context logic. It does not make trading decisions.
+
+`GET /api/v1/ingest/runs`  
+Recent ingestion audit records.
+
+`GET /api/v1/validation-report?year=2026&month=8`  
+Data-quality report.
 
 ## Testing
-
-Run the test suite:
 
 ```bash
 pytest tests/ -v
