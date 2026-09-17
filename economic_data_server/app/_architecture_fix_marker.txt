@@ -1,1 +1,0 @@
-Temporary marker for atomic architecture cleanup branch. This file is removed in the cleanup commit.
