@@ -20,34 +20,24 @@ def calc_score(actual, forecast, inverse=False):
     if actual < forecast: return -1 if inverse else 1
     return 0
 
-def fetch_this_week():
+def fetch_this_week(context_engine: 'ContextEngine'):
     try:
-        xml_data = requests.get(FF_XML_URL).text
-        root = ET.fromstring(xml_data)
-        events = []
-        for node in root.findall('event'):
-            impact = node.find('impact').text
-            if impact != 'High': continue
-            
-            currency = node.find('country').text
-            if currency != 'USD': continue
-            
-            title = node.find('title').text
-            forecast = clean_val(node.find('forecast').text)
-            actual = clean_val(node.find('actual').text)
-            
-            # Simple date parsing
-            date_str = node.find('date').text
-            time_str = node.find('time').text
-            try:
-                # MM-DD-YYYY h:mma
-                dt = datetime.strptime(f"{date_str} {time_str}", "%m-%d-%Y %I:%M%p")
-                events.append({"title": title, "dt": dt, "forecast": forecast, "actual": actual})
-            except Exception:
-                pass
-        return sorted(events, key=lambda x: x["dt"])
+        now = datetime.now()
+        start_str = now.replace(hour=0, minute=0, second=0).isoformat() + "Z"
+        # Fetch upcoming events via context engine
+        events = context_engine.fetch_events(currency="USD", impact="High", start=start_str, limit=50)
+        
+        parsed_events = []
+        for e in events:
+            parsed_events.append({
+                "title": e.get("event"),
+                "dt": e.get("_dt") or datetime.fromisoformat(e["timestamp_utc"].replace("Z", "+00:00")).replace(tzinfo=None),
+                "forecast": clean_val(e.get("forecast")),
+                "actual": clean_val(e.get("actual"))
+            })
+        return sorted(parsed_events, key=lambda x: x["dt"])
     except Exception as e:
-        print(f"[Error] Failed to fetch ForexFactory XML: {e}")
+        print(f"[Error] Failed to fetch events from Economic Data API: {e}")
         return []
 
 def prompt_for_precursor(title):
@@ -63,21 +53,35 @@ def prompt_for_precursor(title):
         except ValueError:
             print("Invalid input. Please enter numbers only.")
 
-def find_precursor(events, title_substring):
-    # Try to find it in this week's events (it must have already happened, so actual is not None)
+from data.context_engine import ContextEngine
+
+def find_precursor(events, title_substring, context_engine=None, target_dt=None):
+    # Try to find in current events feed
     for e in events:
-        if title_substring.lower() in e["title"].lower() and e["actual"] is not None:
+        if title_substring.lower() in e["title"].lower() and e.get("actual") is not None:
             return e
+
+    # Query Economic Context Engine API for historical precursor releases
+    if context_engine and target_dt:
+        release = context_engine.get_latest_release(title_substring, target_dt)
+        if release and release.get("actual") is not None and release.get("forecast") is not None:
+            act = clean_val(release.get("actual"))
+            fcst = clean_val(release.get("forecast"))
+            if act is not None and fcst is not None:
+                print(f"[Context Engine] Retrieved historical precursor '{release.get('event')}': Actual={release.get('actual')}, Forecast={release.get('forecast')}")
+                return {"title": release.get("event"), "actual": act, "forecast": fcst}
+
     # If not found, prompt the user
     return prompt_for_precursor(title_substring)
 
-def predict(target_event, all_events):
+def predict(target_event, all_events, context_engine=None):
     title = target_event["title"]
+    target_dt = target_event["dt"]
     
     if "Farm" in title:
         print("-> Target: Non-Farm Payrolls (NFP). Gathering precursors...")
-        adp = find_precursor(all_events, "ADP Non-Farm")
-        ism_srv = find_precursor(all_events, "ISM Services")
+        adp = find_precursor(all_events, "ADP Non-Farm", context_engine=context_engine, target_dt=target_dt)
+        ism_srv = find_precursor(all_events, "ISM Services", context_engine=context_engine, target_dt=target_dt)
         
         score = calc_score(adp["actual"], adp["forecast"]) * 1.5 + calc_score(ism_srv["actual"], ism_srv["forecast"]) * 1.0
         
@@ -86,7 +90,7 @@ def predict(target_event, all_events):
         
     if "CPI" in title:
         print("-> Target: Consumer Price Index (CPI). Gathering precursors...")
-        ism_mfg = find_precursor(all_events, "ISM Manufacturing PMI")
+        ism_mfg = find_precursor(all_events, "ISM Manufacturing PMI", context_engine=context_engine, target_dt=target_dt)
         
         score = calc_score(ism_mfg["actual"], ism_mfg["forecast"]) * 1.0
         bias = "BUY" if score >= 1.0 else ("SELL" if score <= -1.0 else "SKIP")
@@ -94,7 +98,7 @@ def predict(target_event, all_events):
         
     if "Retail" in title:
         print("-> Target: Retail Sales. Gathering precursors...")
-        conf = find_precursor(all_events, "CB Consumer Confidence")
+        conf = find_precursor(all_events, "CB Consumer Confidence", context_engine=context_engine, target_dt=target_dt)
         
         score = calc_score(conf["actual"], conf["forecast"]) * 2.0
         bias = "BUY" if score >= 1.0 else ("SELL" if score <= -1.0 else "SKIP")
@@ -104,8 +108,12 @@ def predict(target_event, all_events):
 
 def main():
     print("=== News Trader AI : Live Autonomous Predictor ===")
-    print("Fetching live ForexFactory XML...")
-    events = fetch_this_week()
+    
+    from data.context_engine import ContextEngine
+    engine = ContextEngine()
+    
+    print("Fetching live events from Economic Data API...")
+    events = fetch_this_week(engine)
     
     if not events:
         print("No USD High-Impact events found this week.")
@@ -127,7 +135,8 @@ def main():
         
     print(f"\n[TARGET LOCKED]: {target['title']} @ {target['dt']} (Local Time)")
     
-    bias, score = predict(target, events)
+    engine = ContextEngine()
+    bias, score = predict(target, events, context_engine=engine)
     
     if bias == "SKIP":
         print("\n[RESULT] AI determined there is NO CLEAR EDGE based on precursor divergence. Skipping trade.")

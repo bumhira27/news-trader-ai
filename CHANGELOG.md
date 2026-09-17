@@ -1,32 +1,31 @@
 # Changelog
 
-All notable changes to the News Trader AI project will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2024-11-20
+## [1.0.0-stable] - 2026-09-17
+
+### Added
+- **Economic Data Server**: Deployed a dedicated FastAPI microservice to ingest, normalize, and serve macroeconomic calendar events over REST.
+- **Persistence Layer**: Implemented PostgreSQL 15 database storage with a dynamic local fallback to SQLite 3 for offline development.
+- **Idempotent Ingestion CLI**: Added `app.ingest` module for deterministic upserting of historical fixtures and live XML feeds utilizing composite `source_event_key` hashing.
+- **API Contracts**: Introduced `/api/v1/events`, `/api/v1/news-events`, and `/api/v1/validation-report` endpoints for client decoupling.
+- **Docker Toolchain**: Included `Dockerfile` and `docker-compose.yml` for isolated data-server execution.
+- **Test Infrastructure**: Added a comprehensive `pytest` suite ensuring 100% pass rate across normalizer functions, database validators, API routing, and AI context metrics.
 
 ### Changed
-- **Architecture Shift:** Replaced Python `live_predictor.py` IPC architecture with a fully native C# AI heuristic engine. cBot now parses the ForexFactory XML directly.
-- **Risk Management:** Shifted from hard-coded $1000/$500 logic to a dynamic `RiskPercentage` parameter designed to be used with isolated sub-account balances (The "Pot" model).
-- **Execution Guard:** Removed deterministic `OrderCapStrategy` and fully embraced randomized `OrderSplitting` as a broker-obfuscation tactic.
-- **Fail-Safe:** Margin safety check prioritized in `OnTick()` execution loop.
-- **AI Logic:** Introduced explicit `NO TRADE` / Skip states if precursor data is missing or returns a neutral score.
-
-### Removed
-- Removed `news_bias.txt` flat-file observer logic (no longer needed).
-- Removed `OrderCapStrategy`.
-- **Automated IPC Protocol**: Zero-latency flat-file bridge allowing C# to read python-generated predictions from `C:\news_bias.txt`.
-- **Backtest Generation Suite**: Polars and Plotly implementation for outputting equity curves, trade history, and statistical performance matrix.
-- **Holy Trinity Filter**: Automated XML parsing of ForexFactory to restrict execution exclusively to NFP, Retail Sales, and CPI.
-
-### Changed
-- Re-architected the baseline `News Trader Pro` into `News Trader AI`, stripping obsolete indicators in favor of quantitative event-driven logic.
-- Modified Stop Loss logic to account for worst-case M1 pathing and an audited 50-pip slippage penalty model.
+- **Architectural Decoupling**: Disconnected the Python analytical stack from downstream price-reaction calculations; isolated execution strictly to the C# cBot interface.
+- **Context Engine Logic**: Refactored `data/context_engine.py` to fetch historical precursor events directly from the new Economic Data API instead of local static files.
+- **Live Predictor Integration**: Re-wired `live_predictor.py` to route queries through the Context Engine, replacing fragile manual XML polling mechanics.
+- **Documentation**: Overhauled `README.md` to document the production-ready microservice architecture and detailed integration payloads.
 
 ### Fixed
-- **Sequence of Returns Risk (SoRR)**: Removed ISM, FOMC, and PCE from the execution pipeline to mathematically eliminate early drawdown risk and preserve compounding velocity.
+- **API Polling Resilience**: Resolved immediate crashing in `live_predictor.py` caused by `NoneType` attribute errors during XML ingest by migrating logic to the server-side feed normalizer.
+- **Data Validation Failures**: Corrected datetime mapping anomalies by enforcing strictly normalized ISO-8601 UTC formats across all stored events.
 
-### Security
-- **Margin Isolation**: Implemented strict hard-coded lot size formulas mapped to account risk limits ($1000 Bias / $500 Hedge), preventing runaway leverage scaling on double whipsaws.
+### Removed
+- **Legacy Machine Learning Pipeline**: Deleted all 32 experimental ML dataset generators, compound simulators, and optimization routines within the `backtest/` directory.
+- **Heavy Dependencies**: Pruned `polars`, `pyarrow`, `scikit-learn`, `kaleido`, `plotly`, and `datasets` from project lockfiles to eliminate dead weight and reduce compilation latency.
+- **Stale Artifacts**: Removed deprecated HTML backtest reports, equity graph images, and obsolete flat-file JSON databases (`calendar_database.json`).
