@@ -8,11 +8,20 @@ By physically decoupling the data ingestion, context evaluation, and trade execu
 
 **Value Proposition:** Provides quantitative developers with a deterministic, testable data foundation (Economic Data Server) and an auditable decision engine (Context API), preventing the execution layer from failing due to external API rate limits, missing precursors, or complex timezone shifts.
 
+### Trading Strategy
+
+The system trades directional bias on major macroeconomic releases (such as NFP, CPI, FOMC, and GDP) by evaluating specific historical precursor events. 
+
+1. **Precursor Heuristics:** Before a target event, the Context Engine identifies a highly correlated precursor (e.g., evaluating *ADP Non-Farm Employment* prior to the *Non-Farm Payrolls* release).
+2. **Surprise Scoring:** It calculates the "surprise" of the precursor (Actual - Forecast) and applies an asset-specific weight (e.g., a strong US employment precursor acts as a negative weight on USD-denominated assets like XAUUSD).
+3. **Directional Execution:** The evaluated score translates strictly into a `BUY`, `SELL`, or `SKIP` decision.
+4. **Risk & Trade Management:** The C# execution client dynamically sizes the position based on account equity and risk parameters. It supports order splitting to optimize fill rates and manages risk dynamically using absolute trailing stops and hard margin limits.
+
 ## Core Features & Capabilities
 
 - **Deterministic Time Normalization:** Utilizes IANA timezone mapping (`tzdata`) rather than fixed UTC offsets, guaranteeing correct alignment of historical events across Daylight Saving Time boundaries.
 - **Idempotent Data Ingestion:** The data pipeline handles batch processing of historical Forex Factory HTML calendars and current-week XML feeds with automatic duplicate resolution and constraint validation.
-- **Decoupled Precursor Heuristics:** Bias evaluation (e.g., correlating ADP Non-Farm performance prior to NFP releases) is executed entirely server-side, allowing the engine to scan months of historical data instantly.
+- **Decoupled Precursor Heuristics:** Bias evaluation is executed entirely server-side, allowing the engine to scan months of historical data instantly without restricting logic to the current week's feed.
 - **Fail-Safe Execution:** The C# client is designed to degrade gracefully. If the Context API times out or returns a 500, the cBot explicitly defaults to a `SKIP` bias, halting trade execution rather than guessing.
 
 ## Component & Tech Stack
